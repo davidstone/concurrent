@@ -120,7 +120,7 @@ Equivalent to `emplace(value)`
 
 ## pop_all
 
-###`container_type pop_all(container_type storage = container_type{})`
+### `container_type pop_all(container_type storage = container_type{})`
 
 #### Definition
 
@@ -170,7 +170,7 @@ Returns all messages in the queue. After this call, the queue's internal contain
 
 ## pop_one
 
-###`value_type pop_one()`
+### `value_type pop_one()`
 
 #### Definition
 
