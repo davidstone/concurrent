@@ -2,6 +2,8 @@
 
 If you have multiple threads that need to communicate, you need some way to do so safely and efficiently. A thread-safe queue allows you to do this. In this model, one or more threads are "producer" or "writer" threads, and one or more threads are "consumer" or "reader" threads.
 
+Note: This is not an official Boost library. I am proposing it for addition into Boost.
+
 # Highlights
 
 * The bulk interface is faster than other queues for many common load patterns
