@@ -205,11 +205,11 @@ private:
 	};
 
 	// TODO: implement this with if constexpr
-	template<typename Function, typename std::enable_if<!std::is_void<decltype(std::declval<Function>()())>{}, empty>::type = empty{}>
+	template<typename Function, typename std::enable_if<!std::is_void<decltype(std::declval<Function>()())>::value, empty>::type = empty{}>
 	static decltype(auto) wrap_void(Function function) {
 		return function();
 	}
-	template<typename Function, typename std::enable_if<std::is_void<decltype(std::declval<Function>()())>{}, empty>::type = empty{}>
+	template<typename Function, typename std::enable_if<std::is_void<decltype(std::declval<Function>()())>::value, empty>::type = empty{}>
 	static decltype(auto) wrap_void(Function function) {
 		function();
 		return empty{};

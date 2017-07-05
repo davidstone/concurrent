@@ -387,7 +387,7 @@ int main(int argc, char ** argv) {
 		std::cerr << "Must have at least one reader thread\n";
 		return 1;
 	}
-	if (number_of_writers == 0 and number_of_batch_writers == 0) {
+	if (number_of_writers == 0 && number_of_batch_writers == 0) {
 		std::cerr << "Must have at least one writer or batch writer thread\n";
 		return 1;
 	}
