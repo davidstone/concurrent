@@ -4,14 +4,20 @@
 # http://www.boost.org/LICENSE_1_0.txt)
 
 class optimize:
-	compile_flags_debug = [
-		'-Og'
+	link_flags_debug = [
+	]
+	link_flags_release = [
+		'-Ofast',
+		'-march=native',
+		'-flto'
 	]
 	
-	compile_flags_release = [
-		'-Ofast',
+	compile_flags_debug = [
+		'-Og',
 		'-march=native',
 	]
 
-	link_flags_debug = compile_flags_debug
-	link_flags_release = compile_flags_release
+	compile_flags_release = link_flags_release + [
+		'-emit-llvm',
+	]
+
