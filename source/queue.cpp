@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <iostream>
 #include <numeric>
 #include <string>
 
@@ -46,6 +47,7 @@ void test_string() {
 }
 
 
+#ifndef _MSC_VER
 
 struct copy_move_counter {
 	copy_move_counter() noexcept {
@@ -122,9 +124,7 @@ void test_copy_move() {
 	queue.pop_all();
 	check_all();
 	
-	auto array = std::array<copy_move_counter, 3>{
-		copy_move_counter{}, copy_move_counter{}, copy_move_counter{}
-	};
+	auto array = std::array<copy_move_counter, 3>{};
 	expected_default_constructed += array.size();
 	check_all();
 	
@@ -140,6 +140,7 @@ void test_copy_move() {
 	check_all();
 }
 
+#endif
 
 auto now() {
 	return boost::chrono::steady_clock::now();
@@ -394,7 +395,10 @@ int main(int argc, char ** argv) {
 	
 	test_int();
 	test_string();
+
+#ifndef _MSC_VER
 	test_copy_move();
+#endif
 	test_timeout();
 	test_blocking();
 	
