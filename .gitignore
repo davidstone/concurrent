@@ -1,5 +1,1 @@
 build
-.sconsign.dblite
-*.pyc
-queue
-queue-debug
