@@ -25,16 +25,16 @@ namespace concurrent {
 namespace detail {
 
 template<typename Container, typename = void>
-struct supports_pop_front : std::false_type {};
+constexpr bool supports_pop_front = false;
 
 template<typename Container>
-struct supports_pop_front<Container, std::void_t<decltype(std::declval<Container &>().pop_front())>> : std::true_type {};
+constexpr bool supports_pop_front<Container, std::void_t<decltype(std::declval<Container &>().pop_front())>> = true;
 
 
 template<typename Container, typename Derived>
 struct basic_queue_impl {
 	using container_type = Container;
-	using value_type = typename container_type::value_type;
+	using value_type = typename Container::value_type;
 
 	basic_queue_impl() = default;
 
@@ -85,7 +85,7 @@ struct basic_queue_impl {
 	//
 	// This overload never returns an empty container. If the queue is empty,
 	// this will block
-	container_type pop_all(container_type storage = container_type{}) {
+	Container pop_all(Container storage = Container{}) {
 		return generic_pop_all(wait_for_data(), std::move(storage));
 	}
 
@@ -93,11 +93,11 @@ struct basic_queue_impl {
 	// unless the timeout is reached, in which case they return an empty
 	// container.
 	template<typename Clock, typename Duration>
-	container_type pop_all(boost::chrono::time_point<Clock, Duration> const timeout, container_type storage = container_type{}) {
+	Container pop_all(boost::chrono::time_point<Clock, Duration> const timeout, Container storage = Container{}) {
 		return generic_pop_all(wait_for_data(timeout), std::move(storage));
 	}
 	template<typename Rep, typename Period>
-	container_type pop_all(boost::chrono::duration<Rep, Period> const timeout, container_type storage = container_type{}) {
+	Container pop_all(boost::chrono::duration<Rep, Period> const timeout, Container storage = Container{}) {
 		return generic_pop_all(wait_for_data(timeout), std::move(storage));
 	}
 
@@ -269,7 +269,7 @@ private:
 		// A, B, 1, 2: Same as A, 1, 2, B. 2 never waits because 1 does not
 		// find an empty container.
 		if (was_empty) {
-			if (detail::supports_pop_front<Container>{} && adding_several) {
+			if constexpr (detail::supports_pop_front<Container> && adding_several) {
 				m_notify_addition.notify_all();
 			} else {
 				m_notify_addition.notify_one();
@@ -337,11 +337,11 @@ public:
 private:
 	friend base;
 
-	void handle_add(container_type &, boost::unique_lock<boost::mutex> &) {
+	void handle_add(Container &, boost::unique_lock<boost::mutex> &) {
 	}
-	void handle_remove_all(typename container_type::size_type) {
+	void handle_remove_all(typename Container::size_type) {
 	}
-	void handle_remove_one(typename container_type::size_type) {
+	void handle_remove_one(typename Container::size_type) {
 	}
 };
 
@@ -361,7 +361,7 @@ public:
 	using typename base::container_type;
 	using typename base::value_type;
 
-	explicit basic_blocking_queue(typename container_type::size_type const max_size_):
+	explicit basic_blocking_queue(typename Container::size_type const max_size_):
 		m_max_size(max_size_)
 	{
 	}
@@ -387,21 +387,21 @@ public:
 private:
 	friend base;
 
-	void handle_add(container_type & queue, boost::unique_lock<boost::mutex> & lock) {
+	void handle_add(Container & queue, boost::unique_lock<boost::mutex> & lock) {
 		m_notify_removal.wait(lock, [&]{ return queue.size() < m_max_size; });
 	}
-	void handle_remove_all(typename container_type::size_type const previous_size) {
+	void handle_remove_all(typename Container::size_type const previous_size) {
 		if (previous_size >= max_size()) {
 			m_notify_removal.notify_all();
 		}
 	}
-	void handle_remove_one(typename container_type::size_type const previous_size) {
+	void handle_remove_one(typename Container::size_type const previous_size) {
 		if (previous_size >= max_size()) {
 			m_notify_removal.notify_one();
 		}
 	}
 
-	typename container_type::size_type m_max_size;
+	typename Container::size_type m_max_size;
 	movable_condition_variable m_notify_removal;
 };
 
@@ -420,7 +420,7 @@ public:
 	using typename base::container_type;
 	using typename base::value_type;
 
-	explicit basic_dropping_queue(typename container_type::size_type const max_size_):
+	explicit basic_dropping_queue(typename Container::size_type const max_size_):
 		m_max_size(max_size_)
 	{
 	}
@@ -446,21 +446,21 @@ public:
 private:
 	friend base;
 
-	auto handle_add(container_type & queue, boost::unique_lock<boost::mutex> &) {
+	auto handle_add(Container & queue, boost::unique_lock<boost::mutex> &) {
 		if (queue.size() < max_size())
 		{
-			return static_cast<typename container_type::size_type>(0);
+			return static_cast<typename Container::size_type>(0);
 		}
 		auto const skipped = queue.size();
 		queue.clear();
 		return skipped;
 	}
-	void handle_remove_all(typename container_type::size_type) {
+	void handle_remove_all(typename Container::size_type) {
 	}
-	void handle_remove_one(typename container_type::size_type) {
+	void handle_remove_one(typename Container::size_type) {
 	}
 
-	typename container_type::size_type m_max_size;
+	typename Container::size_type m_max_size;
 };
 
 template<typename T, typename Allocator = std::allocator<T>>
