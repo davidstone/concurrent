@@ -24,14 +24,11 @@ namespace boost {
 namespace concurrent {
 namespace detail {
 
-template<typename...>
-using void_t = void;
-
 template<typename Container, typename = void>
 struct supports_pop_front : std::false_type {};
 
 template<typename Container>
-struct supports_pop_front<Container, void_t<decltype(std::declval<Container &>().pop_front())>> : std::true_type {};
+struct supports_pop_front<Container, std::void_t<decltype(std::declval<Container &>().pop_front())>> : std::true_type {};
 
 
 template<typename Container, typename Derived>
