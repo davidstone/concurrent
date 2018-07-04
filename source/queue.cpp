@@ -229,11 +229,10 @@ struct Reader {
 	std::size_t cost_per_batch;
 };
 
-void test_ordering(Reader const reader, std::size_t number_of_individual_writers, std::size_t number_of_bulk_writers, std::size_t bulk_size) {
+void test_ordering(Reader const reader, std::size_t number_of_writers, std::size_t bulk_size) {
 	std::atomic<std::uint64_t> number_of_reads(0);
 	std::atomic<std::uint64_t> items_read(0);
-	std::atomic<std::uint64_t> number_of_individual_writes(0);
-	std::atomic<std::uint64_t> number_of_bulk_writes(0);
+	std::atomic<std::uint64_t> number_of_writes(0);
 	
 	auto const start = now();
 
@@ -315,20 +314,11 @@ void test_ordering(Reader const reader, std::size_t number_of_individual_writers
 			}
 		});
 
-		auto const individual_writer_threads = create_threads(number_of_individual_writers, [&]{
-			auto local_number_of_individual_writes = std::uint64_t(0);
-			auto const update_count_of_writes = update_atomic(number_of_individual_writes, local_number_of_individual_writes);
+		auto const writer_threads = create_threads(number_of_writers, [&]{
+			auto local_number_of_writes = std::uint64_t(0);
+			auto const update_count_of_writes = update_atomic(number_of_writes, local_number_of_writes);
 			while (!boost::this_thread::interruption_requested()) {
-				++local_number_of_individual_writes;
-				queue.push(individual_data);
-			}
-		});
-
-		auto const bulk_writer_threads = create_threads(number_of_bulk_writers, [&]{
-			auto local_number_of_bulk_writes = std::uint64_t(0);
-			auto const update_count_of_writes = update_atomic(number_of_bulk_writes, local_number_of_bulk_writes);
-			while (!boost::this_thread::interruption_requested()) {
-				++local_number_of_bulk_writes;
+				++local_number_of_writes;
 				queue.append(bulk_data.begin(), bulk_data.end());
 			}
 		});
@@ -338,19 +328,10 @@ void test_ordering(Reader const reader, std::size_t number_of_individual_writers
 
 	auto const end = now();
 	
-	assert(items_read == number_of_individual_writes + number_of_bulk_writes * bulk_size);
+	assert(items_read == number_of_writes * bulk_size);
 
-	if (number_of_individual_writers != 0) {
-		std::cout << "Individual writes: " << number_of_individual_writes << '\n';
-	}
-	if (number_of_bulk_writers != 0) {
-		std::cout << "Bulk writes: " << number_of_bulk_writes << '\n';
-	}
-	std::cout << "Reads: " << number_of_reads << '\n';
-	std::cout << "Items read: " << items_read << '\n';
-	std::cout << "Average read size: " << static_cast<double>(items_read) / static_cast<double>(number_of_reads) << '\n';
-	std::cout << "Total number queued: " << items_read << '\n';
-	std::cout << "milliseconds: " << boost::chrono::duration_cast<boost::chrono::milliseconds>(end - start).count() << '\n';
+	auto const time_taken = boost::chrono::duration_cast<boost::chrono::microseconds>(end - start).count();
+	std::cout << "Millions of messages / second: " << static_cast<double>(items_read) / time_taken << '\n';
 }
 
 }	// namespace
@@ -360,12 +341,11 @@ int main(int argc, char ** argv) {
 	po::options_description description("Allowed options");
 	description.add_options()
 		("help", "produce help message")
-		("item-cost", po::value<std::size_t>()->default_value(10), "Amount of work it takes to process an item on the read side (independent of batch size), measured in reads of memory")
-		("batch-cost", po::value<std::size_t>()->default_value(10), "Amount work it takes to process a batch of items on the read side, measured in reads of memory. If there is no benefit from batching, this should be 0")
+		("item-cost", po::value<std::size_t>()->default_value(0), "Amount of work it takes to process an item on the read side (independent of batch size), measured in reads of memory")
+		("batch-cost", po::value<std::size_t>()->default_value(0), "Amount work it takes to process a batch of items on the read side, measured in reads of memory. If there is no benefit from batching, this should be 0")
 		("readers", po::value<std::size_t>()->default_value(1), "Number of threads reading data (minimum of 1)")
-		("writers", po::value<std::size_t>()->default_value(1), "Number of threads writing data one element at a time")
-		("batch-writers", po::value<std::size_t>()->default_value(1), "Number of threads writing data in batches")
-		("batch-size", po::value<std::size_t>()->default_value(20), "Number of elements the batch-writers are adding at a time")
+		("writers", po::value<std::size_t>()->default_value(1), "Number of threads writing data (minimum of 1)")
+		("batch-size", po::value<std::size_t>()->default_value(2000), "Number of elements the writers are adding at a time")
 	;
 	
 	po::variables_map options;
@@ -381,15 +361,14 @@ int main(int argc, char ** argv) {
 	auto const cost_per_batch = options["batch-cost"].as<std::size_t>();
 	auto const number_of_readers = options["readers"].as<std::size_t>();
 	auto const number_of_writers = options["writers"].as<std::size_t>();
-	auto const number_of_batch_writers = options["batch-writers"].as<std::size_t>();
 	auto const batch_size = options["batch-size"].as<std::size_t>();
 	
 	if (number_of_readers == 0) {
 		std::cerr << "Must have at least one reader thread\n";
 		return 1;
 	}
-	if (number_of_writers == 0 && number_of_batch_writers == 0) {
-		std::cerr << "Must have at least one writer or batch writer thread\n";
+	if (number_of_writers == 0) {
+		std::cerr << "Must have at least one writer thread\n";
 		return 1;
 	}
 	
@@ -403,5 +382,5 @@ int main(int argc, char ** argv) {
 	test_blocking();
 	
 	auto const reader = Reader{number_of_readers, cost_per_item, cost_per_batch};
-	test_ordering(reader, number_of_writers, number_of_batch_writers, batch_size);
+	test_ordering(reader, number_of_writers, batch_size);
 }
