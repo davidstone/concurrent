@@ -149,11 +149,11 @@ This is because of the way that `boost::thread` interruption points work with `c
 
 ## Is this thing lock-free? Isn't lock-free better?
 
-No.
+No, it is not lock-free, but that is not necessarily a bad thing.
 
 Many people have a few misconceptions over what it means for something to be lock-free and why they want it. If all you care about is overall throughput, you do not necessarily want a lock-free queue. "Lock-free" refers specifically to a guarantee that the system as a whole can make progress even if some (but not all) of the threads are suspended indefinitely.
 
-Lock-free queues often have better worst-case performance guarantees than lock-based queues by virtue of making fewer system calls.
+Lock-free queues may have better worst-case performance guarantees than lock-based queues by virtue of making fewer system calls and being less reliant on the thread scheduler.
 
 The main goal of this queue is to maximize total throughput. It achieves this goal by giving the user as many elements back as possible on a pop operation. This means that there are fewer requests back to the queue for more data, and thus, less contention.
 
@@ -172,3 +172,11 @@ It's a bit difficult to answer that question, as it depends heavily on hardware,
 To try to answer this question and show that I did not just write a benchmark that suites my queue but does not reflect reality, this queue is integrated into the [moodycamel benchmarks](https://github.com/davidstone/concurrentqueue). This shows that when the queue is used in ways similar to how it is shown above (mostly, when you use the bulk-dequeue operation), this queue tends to outperform all other queues. When you do not use the queue properly, it performs similar to or slightly worse than the `boost::lockfree::queue`.
 
 To help you tune the number of readers and writers on your particular hardware, there is also a test program included in this repository. Simply compile and run `source/queue.cpp` (pass `--help` to see the configuration parameters).
+
+Using this test application on my computer and properly tuning the number of readers, writers, and batch size (elements per write), my laptop is able to push through about 3.5 billion int / second at a maximum, including time spent writing the values and reading them back to ensure we read the correct values. This works out to about 82% of the theoretical maximum for my memory bus (using an Intel i7 6700HQ) if the only data transfer happening were the data in the queue. This same maximum can come from any recent version of gcc or clang on Linux or under minGW, or from Visual Studio 2017.
+
+The exact right balance of readers, writers, and batch size seems to be slightly different with Visual Studio vs. gcc or clang, so these next example numbers (for my particular hardware) are for gcc or clang with `-O3 -match=native -flto`. The queue can process 1 billion int per second with 1 reader thread, 1 writer thread, and 1000 int added per batch. This throughput scales approximately linearly with batch size up until this point, so a batch size of 500 gives you approximately 500 million int per second. After that, it's a little trickier to improve throughput, but as far as I can tell, the ideal number on this type of processor gets you up to 3.5 billion int per second with 3 reader threads, 1 writer thread, and a batch size of 5080.
+
+Using the queue in the worst possible way can degrade performance pretty significantly from this point. The worst case for the queue is to have many (10+) readers doing almost no work per item with a single writer adding 1 element per batch. This case gives you only 550,000 int / second.
+
+To help understand how the numbers work in the middle, 1 reader and 4 writers writing 40 elements per batch gives about 100 million int per second through the queue.
