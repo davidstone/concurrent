@@ -37,13 +37,13 @@ target_link_libraries(concurrent_queue INTERFACE
 	boost_thread
 )
 
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+if(MSVC)
 	target_compile_options(concurrent_queue INTERFACE
-		${CONCURRENT_QUEUE_CXX_STD}
+		"/std:c++17"
 	)
 else()
 	target_compile_options(concurrent_queue INTERFACE
-		${CONCURRENT_QUEUE_CXX_STD}
+		"-std=c++17"
 	)
 endif()
 
@@ -176,6 +176,13 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 	target_compile_options(concurrent_queue_test PRIVATE ${COMPILE_OPTIONS})
 
 	set_sanitizers(concurrent_queue_test)
+
+elseif(MSVC)
+	set(COMPILE_OPTIONS
+		"/W4"
+		"/WX"
+	)
+	target_compile_options(concurrent_queue_test PRIVATE ${COMPILE_OPTIONS})
 endif()
 
 add_test(concurrent_queue_test concurrent_queue_test)
