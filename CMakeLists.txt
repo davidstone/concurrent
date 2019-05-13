@@ -6,15 +6,9 @@
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 project(concurrent_queue LANGUAGES CXX)
 
-find_package(Boost COMPONENTS system thread REQUIRED)
+find_package(Boost COMPONENTS chrono program_options system thread REQUIRED)
 add_library(boost INTERFACE IMPORTED)
-target_compile_definitions(boost INTERFACE
-	BOOST_ALL_NO_LIB
-	BOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING
-	BOOST_CHRONO_DONT_PROVIDES_DEPRECATED_IO_SINCE_V2_0_0
-	BOOST_CHRONO_HEADER_ONLY
-	BOOST_ERROR_CODE_HEADER_ONLY
-)
+target_compile_definitions(boost INTERFACE BOOST_ALL_NO_LIB)
 set_property(TARGET boost PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIR})
 enable_testing()
 
@@ -33,7 +27,9 @@ target_include_directories(concurrent_queue INTERFACE
 
 target_link_libraries(concurrent_queue INTERFACE
 	boost
+	boost_chrono
 	boost_program_options
+	boost_system
 	boost_thread
 )
 
