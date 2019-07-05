@@ -158,8 +158,8 @@ void test_timeout() {
 	assert(after_time_point - before_time_point >= duration);
 	assert(after_duration - after_time_point >= duration);
 
-	assert(values_time_point.empty());
-	assert(values_duration.empty());
+	assert(empty(values_time_point));
+	assert(empty(values_duration));
 	
 	queue.push(0);
 	auto const should_be_fast = queue.pop_all(boost::chrono::hours(24 * 365));
@@ -167,7 +167,7 @@ void test_timeout() {
 	assert(should_be_fast[0] == 0);
 	
 	auto const immediate = queue.try_pop_all();
-	assert(immediate.empty());
+	assert(empty(immediate));
 }
 
 

@@ -35,6 +35,11 @@ inline constexpr auto size = [](auto && range) {
 	return size(range);
 };
 
+inline constexpr auto empty = [](auto && range) {
+	using std::empty;
+	return empty(range);
+};
+
 
 template<typename Container, typename Derived>
 struct basic_queue_impl {
@@ -124,7 +129,7 @@ struct basic_queue_impl {
 	template<typename Clock, typename Duration>
 	boost::optional<value_type> pop_one(boost::chrono::time_point<Clock, Duration> const timeout) {
 		auto lock = wait_for_data(timeout);
-		if (m_container.empty()) {
+		if (empty(m_container)) {
 			return boost::none;
 		}
 		return generic_pop_one(std::move(lock));
@@ -132,7 +137,7 @@ struct basic_queue_impl {
 	template<typename Rep, typename Period>
 	boost::optional<value_type> pop_one(boost::chrono::duration<Rep, Period> const timeout) {
 		auto lock = wait_for_data(timeout);
-		if (m_container.empty()) {
+		if (empty(m_container)) {
 			return boost::none;
 		}
 		return generic_pop_one(std::move(lock));
@@ -140,7 +145,7 @@ struct basic_queue_impl {
 
 	boost::optional<value_type> try_pop_one() {
 		auto lock = lock_type(m_mutex);
-		if (m_container.empty()) {
+		if (empty(m_container)) {
 			return boost::none;
 		}
 		return generic_pop_one(std::move(lock));
@@ -169,7 +174,7 @@ private:
 	using lock_type = boost::unique_lock<boost::mutex>;
 
 	auto is_not_empty() const {
-		return [=]{ return !m_container.empty(); };
+		return [=]{ return !empty(m_container); };
 	}
 
 	auto wait_for_data() {
@@ -200,25 +205,24 @@ private:
 
 	// Until we can get something like this proposal
 	// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0146r1.html
-	// we require multiple levels of template indirection with empty, wrap_void,
-	// and unwrap_forward
+	// we require multiple levels of template indirection with empty_t,
+	// wrap_void, and unwrap_forward
 
-	enum class empty {
-	};
+	enum class empty_t {};
 
 	// TODO: implement this with if constexpr
-	template<typename Function, typename std::enable_if<!std::is_void<decltype(std::declval<Function>()())>::value, empty>::type = empty{}>
+	template<typename Function, typename std::enable_if<!std::is_void<decltype(std::declval<Function>()())>::value, empty_t>::type = empty_t{}>
 	static decltype(auto) wrap_void(Function function) {
 		return function();
 	}
-	template<typename Function, typename std::enable_if<std::is_void<decltype(std::declval<Function>()())>::value, empty>::type = empty{}>
+	template<typename Function, typename std::enable_if<std::is_void<decltype(std::declval<Function>()())>::value, empty_t>::type = empty_t{}>
 	static decltype(auto) wrap_void(Function function) {
 		function();
-		return empty{};
+		return empty_t{};
 	}
 	
 	template<typename>
-	static void unwrap_forward(empty) {
+	static void unwrap_forward(empty_t) {
 	}
 	template<typename T, typename Arg>
 	static decltype(auto) unwrap_forward(Arg && value) {
@@ -239,7 +243,7 @@ private:
 	decltype(auto) generic_add(Bool const adding_several, Function && add) {
 		auto lock = lock_type(m_mutex);
 		decltype(auto) result = wrap_void([&]() -> decltype(auto) { return derived().handle_add(m_container, lock); });
-		auto const was_empty = m_container.empty();
+		auto const was_empty = empty(m_container);
 		add();
 		lock.unlock();
 		// It is safe to notify outside of the lock here.
