@@ -87,18 +87,12 @@ struct copy_move_counter {
 		return s_move_assigned;
 	}
 private:
-	static std::size_t s_default_constructed;
-	static std::size_t s_copy_constructed;
-	static std::size_t s_move_constructed;
-	static std::size_t s_copy_assigned;
-	static std::size_t s_move_assigned;
+	static inline std::size_t s_default_constructed = 0;
+	static inline std::size_t s_copy_constructed = 0;
+	static inline std::size_t s_move_constructed = 0;
+	static inline std::size_t s_copy_assigned = 0;
+	static inline std::size_t s_move_assigned = 0;
 };
-
-std::size_t copy_move_counter::s_default_constructed = 0;
-std::size_t copy_move_counter::s_copy_constructed = 0;
-std::size_t copy_move_counter::s_move_constructed = 0;
-std::size_t copy_move_counter::s_copy_assigned = 0;
-std::size_t copy_move_counter::s_move_assigned = 0;
 
 void test_copy_move() {
 	// Some of these tests will fail if the standard library implementation
