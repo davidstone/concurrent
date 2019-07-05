@@ -174,7 +174,7 @@ private:
 	using lock_type = boost::unique_lock<boost::mutex>;
 
 	auto is_not_empty() const {
-		return [=]{ return !empty(m_container); };
+		return [&]{ return !empty(m_container); };
 	}
 
 	auto wait_for_data() {
