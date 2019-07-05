@@ -30,6 +30,11 @@ constexpr bool supports_pop_front = false;
 template<typename Container>
 constexpr bool supports_pop_front<Container, std::void_t<decltype(std::declval<Container &>().pop_front())>> = true;
 
+inline constexpr auto size = [](auto && range) {
+	using std::size;
+	return size(range);
+};
+
 
 template<typename Container, typename Derived>
 struct basic_queue_impl {
@@ -144,7 +149,7 @@ struct basic_queue_impl {
 
 	void clear() {
 		auto const lock = lock_type(m_mutex);
-		auto const previous_size = m_container.size();
+		auto const previous_size = size(m_container);
 		m_container.clear();
 		derived().handle_remove_all(previous_size);
 	}
@@ -157,7 +162,7 @@ struct basic_queue_impl {
 	}
 	auto size() const {
 		auto lock = lock_type(m_mutex);
-		return m_container.size();
+		return boost::concurrent::detail::size(m_container);
 	}
 
 private:
@@ -287,14 +292,14 @@ private:
 	container_type generic_pop_all(lock_type lock, container_type storage) {
 		using std::swap;
 		swap(m_container, storage);
-		derived().handle_remove_all(storage.size());
+		derived().handle_remove_all(boost::concurrent::detail::size(storage));
 		lock.unlock();
 		return storage;
 	}
 
 	// lock must be in the locked state
 	value_type generic_pop_one(lock_type lock) {
-		auto const previous_size = m_container.size();
+		auto const previous_size = size(m_container);
 		auto result = std::move(m_container.front());
 		m_container.pop_front();
 		derived().handle_remove_one(previous_size);
@@ -388,7 +393,7 @@ private:
 	friend base;
 
 	void handle_add(Container & queue, boost::unique_lock<boost::mutex> & lock) {
-		m_notify_removal.wait(lock, [&]{ return queue.size() < m_max_size; });
+		m_notify_removal.wait(lock, [&]{ return size(queue) < m_max_size; });
 	}
 	void handle_remove_all(typename Container::size_type const previous_size) {
 		if (previous_size >= max_size()) {
@@ -447,11 +452,11 @@ private:
 	friend base;
 
 	auto handle_add(Container & queue, boost::unique_lock<boost::mutex> &) {
-		if (queue.size() < max_size())
+		if (size(queue) < max_size())
 		{
 			return static_cast<typename Container::size_type>(0);
 		}
-		auto const skipped = queue.size();
+		auto const skipped = size(queue);
 		queue.clear();
 		return skipped;
 	}

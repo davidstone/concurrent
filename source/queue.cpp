@@ -22,12 +22,12 @@ void test_int() {
 	queue.emplace(0);
 	queue.push(7);
 	auto const first_values = queue.pop_all();
-	assert(first_values.size() == 2);
+	assert(size(first_values) == 2);
 	assert(first_values[0] == 0);
 	assert(first_values[1] == 7);
 	queue.push(4);
 	auto const second_values = queue.pop_all();
-	assert(second_values.size() == 1);
+	assert(size(second_values) == 1);
 }
 
 // Tests ranges and conversions
@@ -125,18 +125,18 @@ void test_copy_move() {
 	check_all();
 	
 	auto array = std::array<copy_move_counter, 3>{};
-	expected_default_constructed += array.size();
+	expected_default_constructed += size(array);
 	check_all();
 	
 	queue.append(array.begin(), array.end());
-	expected_copy_constructed += array.size();
+	expected_copy_constructed += size(array);
 	check_all();
 	
 	queue.pop_all();
 	check_all();
 	
 	queue.append(std::make_move_iterator(array.begin()), std::make_move_iterator(array.end()));
-	expected_move_constructed += array.size();
+	expected_move_constructed += size(array);
 	check_all();
 }
 
@@ -163,7 +163,7 @@ void test_timeout() {
 	
 	queue.push(0);
 	auto const should_be_fast = queue.pop_all(boost::chrono::hours(24 * 365));
-	assert(should_be_fast.size() == 1);
+	assert(size(should_be_fast) == 1);
 	assert(should_be_fast[0] == 0);
 	
 	auto const immediate = queue.try_pop_all();
@@ -184,7 +184,7 @@ void test_blocking() {
 	});
 	auto const result = queue.pop_all();
 	assert(now() >= time_to_wake_up);
-	assert(result.size() == 1);
+	assert(size(result) == 1);
 	assert(result.front() == value);
 }
 
@@ -286,8 +286,7 @@ void test_ordering(Reader const reader, std::size_t number_of_writers, std::size
 			// we get one last read.
 			auto process_data = [&] {
 				++local_number_of_reads;
-				local_items_read += data.size();
-				for (auto it = data.begin(); it != data.end();) {
+				local_items_read += size(data);
 					if (*it == individual_data) {
 						++it;
 						wait(reader.cost_per_item);
