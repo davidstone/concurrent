@@ -9,10 +9,9 @@
 
 #pragma once
 
-#include <boost/concurrent/movable_condition_variable.hpp>
-#include <boost/concurrent/movable_mutex.hpp>
-
 #include <boost/optional.hpp>
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <boost/thread/lock_types.hpp>
 
@@ -47,14 +46,6 @@ struct basic_queue_impl {
 	using value_type = typename Container::value_type;
 
 	basic_queue_impl() = default;
-
-	// Not thread safe: See movable_mutex.hpp
-	basic_queue_impl(basic_queue_impl &&) = default;
-
-	basic_queue_impl(basic_queue_impl const &) = delete;
-	basic_queue_impl & operator=(basic_queue_impl const &) = delete;
-	basic_queue_impl & operator=(basic_queue_impl &&) = delete;
-
 
 	// If you know you will be adding multiple elements into the queue, prefer
 	// to use the range-based append member function, as it will take a single
@@ -312,8 +303,8 @@ private:
 	}
 
 	container_type m_container;
-	movable_mutex m_mutex;
-	movable_condition_variable m_notify_addition;
+	mutable boost::mutex m_mutex;
+	boost::condition_variable m_notify_addition;
 };
 
 }	// namespace detail
@@ -411,7 +402,7 @@ private:
 	}
 
 	typename Container::size_type m_max_size;
-	movable_condition_variable m_notify_removal;
+	boost::condition_variable m_notify_removal;
 };
 
 template<typename T, typename Allocator = std::allocator<T>>

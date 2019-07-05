@@ -15,8 +15,6 @@ enable_testing()
 add_library(concurrent_queue INTERFACE)
 
 target_sources(concurrent_queue INTERFACE
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include/boost/concurrent/movable_condition_variable.hpp
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include/boost/concurrent/movable_mutex.hpp
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include/boost/concurrent/queue.hpp
 )
 
@@ -44,8 +42,6 @@ else()
 endif()
 
 add_executable(concurrent_queue_test
-	source/movable_condition_variable.cpp
-	source/movable_mutex.cpp
 	source/queue.cpp
 )
 
