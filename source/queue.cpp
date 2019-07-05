@@ -256,7 +256,7 @@ void test_ordering(Reader const reader, std::size_t number_of_writers, std::size
 		};
 		
 		// `cost` is volatile to ensure that we generate a read from memory
-		auto wait = [&](std::size_t const volatile cost) {
+		auto wait = [](std::size_t const volatile cost) {
 			for (std::size_t n = 0; n != cost; ++n) {
 			}
 		};
