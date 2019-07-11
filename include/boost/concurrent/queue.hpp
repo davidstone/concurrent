@@ -58,6 +58,12 @@ struct basic_queue_impl {
 		return generic_add(adding_several, [&]{ m_container.insert(m_container.end(), first, last); });
 	}
 
+	template<typename InputIterator, typename Sentinel>
+	bool non_blocking_append(InputIterator const first, Sentinel const last) {
+		constexpr auto adding_several = std::true_type{};
+		return generic_non_blocking_add(adding_several, [&]{ m_container.insert(m_container.end(), first, last); });
+	}
+
 	template<typename... Args>
 	decltype(auto) emplace(Args && ... args) {
 		constexpr auto adding_several = std::false_type{};
@@ -68,6 +74,18 @@ struct basic_queue_impl {
 	}
 	decltype(auto) push(value_type const & value) {
 		return emplace(value);
+	}
+
+	template<typename... Args>
+	bool non_blocking_emplace(Args && ... args) {
+		constexpr auto adding_several = std::false_type{};
+		return generic_non_blocking_add(adding_several, [&]{ m_container.emplace_back(std::forward<Args>(args)...); });
+	}
+	bool non_blocking_push(value_type && value) {
+		return non_blocking_emplace(std::move(value));
+	}
+	bool non_blocking_push(value_type const & value) {
+		return non_blocking_emplace(value);
 	}
 
 
@@ -232,7 +250,21 @@ private:
 
 	template<typename Bool, typename Function>
 	decltype(auto) generic_add(Bool const adding_several, Function && add) {
-		auto lock = lock_type(m_mutex);
+		return generic_add_impl(adding_several, lock_type(m_mutex), add);
+	}
+
+	template<typename Bool, typename Function>
+	bool generic_non_blocking_add(Bool const adding_several, Function && add) {
+		auto lock = lock_type(m_mutex, boost::try_to_lock);
+		if (!lock.owns_lock()) {
+			return false;
+		}
+		generic_add_impl(adding_several, std::move(lock), add);
+		return true;
+	}
+
+	template<typename Bool, typename Function>
+	decltype(auto) generic_add_impl(Bool const adding_several, lock_type lock, Function && add) {
 		decltype(auto) result = wrap_void([&]() -> decltype(auto) { return derived().handle_add(m_container, lock); });
 		auto const was_empty = empty(m_container);
 		add();
@@ -321,8 +353,11 @@ public:
 	basic_unbounded_queue() = default;
 
 	using base::append;
+	using base::non_blocking_append;
 	using base::emplace;
+	using base::non_blocking_emplace;
 	using base::push;
+	using base::non_blocking_push;
 
 	using base::pop_all;
 	using base::try_pop_all;
@@ -371,8 +406,11 @@ public:
 	}
 
 	using base::append;
+	using base::non_blocking_append;
 	using base::emplace;
+	using base::non_blocking_emplace;
 	using base::push;
+	using base::non_blocking_push;
 
 	using base::pop_all;
 	using base::try_pop_all;
@@ -430,8 +468,11 @@ public:
 	}
 
 	using base::append;
+	using base::non_blocking_append;
 	using base::emplace;
+	using base::non_blocking_emplace;
 	using base::push;
+	using base::non_blocking_push;
 
 	using base::pop_all;
 	using base::try_pop_all;
