@@ -311,8 +311,8 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 			auto local_number_of_writes = std::uint64_t(0);
 			auto const update_count_of_writes = update_atomic(number_of_writes, local_number_of_writes);
 			while (!boost::this_thread::interruption_requested()) {
+				queue.append(bulk_data_begin, bulk_data_end);
 				++local_number_of_writes;
-				queue.append(bulk_data.begin(), bulk_data.end());
 			}
 		});
 	
