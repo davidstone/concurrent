@@ -229,23 +229,28 @@ private:
 	bool is_active;
 };
 
+constexpr auto reserved_size = 3'000'000'000;
+template<typename T>
+using Container = std::vector<T>;
 
+template<typename T>
+void reserve(Container<T> & v) {
+	v.reserve(static_cast<typename Container<T>::size_type>(reserved_size));
+}
+#endif
 void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers, std::size_t bulk_size) {
 	std::atomic<std::uint64_t> largest_read(0);
 	std::atomic<std::uint64_t> items_read(0);
 	std::atomic<std::uint64_t> number_of_writes(0);
 	
-	auto const start = now();
-
-	{
-		auto const individual_data = 42;
-		auto const bulk_data = [=]{
-			auto result = std::vector<int>(bulk_size);
+	using value_type = int;
+	auto const bulk_data_source = [=]{
+		auto result = std::vector<value_type>(bulk_size);
 			std::iota(result.begin(), result.end(), 0);
 			return result;
 		}();
-	
-		auto queue = boost::concurrent::unbounded_queue<int>{};
+	value_type const * const bulk_data_begin = bulk_data_source.data();
+	value_type const * const bulk_data_end = bulk_data_source.data() + size(bulk_data_source);
 		
 		auto create_threads = [](auto const count, auto const function) {
 			auto threads = std::vector<thread_t>{};
@@ -258,11 +263,17 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 		
 	auto update_atomic = [](auto & atomic, auto & local) { return scope_guard([&]{ atomic += local; }); };
 		
+	auto queue = boost::concurrent::basic_unbounded_queue<Container<value_type>>{};
+	queue.reserve(static_cast<Container<value_type>::size_type>(reserved_size));
 		
-		// Each thread is either adding individual_data, or atomically adding all of
-		// bulk_data. The reader thread should only see units of individual_data or
-		// bulk_data, never a partial update.
+	auto const start = now();
+
+	{
+		// The reader thread should only see units of bulk_data, never a partial
+		// update.
 		auto const reader_threads = create_threads(number_of_readers, [&]{
+			auto data = Container<value_type>();
+			reserve(data);
 
 			auto local_largest_read = std::uint64_t(0);
 			auto const update_largest_read = scope_guard([&]{
@@ -288,9 +299,9 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 				local_largest_read = std::max(local_largest_read, static_cast<std::size_t>(count));
 				local_items_read += count;
 				for (auto it = begin(data); it != end(data);) {
-						for (auto const expected : bulk_data) {
+					for (auto p = bulk_data_begin; p != bulk_data_end; ++p) {
 						CONCURRENT_TEST(it != end(data));
-						CONCURRENT_TEST(*it == expected);
+						CONCURRENT_TEST(*it == *p);
 							++it;
 					}
 				}
