@@ -9,12 +9,12 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <boost/thread/lock_types.hpp>
 
+#include <optional>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -136,26 +136,26 @@ struct basic_queue_impl {
 	// available, unless the timeout is reached, in which case they return
 	// boost::none
 	template<typename Clock, typename Duration>
-	boost::optional<value_type> pop_one(boost::chrono::time_point<Clock, Duration> const timeout) {
+	std::optional<value_type> pop_one(boost::chrono::time_point<Clock, Duration> const timeout) {
 		auto lock = wait_for_data(timeout);
 		if (empty(m_container)) {
-			return boost::none;
+			return std::nullopt;
 		}
 		return generic_pop_one(std::move(lock));
 	}
 	template<typename Rep, typename Period>
-	boost::optional<value_type> pop_one(boost::chrono::duration<Rep, Period> const timeout) {
+	std::optional<value_type> pop_one(boost::chrono::duration<Rep, Period> const timeout) {
 		auto lock = wait_for_data(timeout);
 		if (empty(m_container)) {
-			return boost::none;
+			return std::nullopt;
 		}
 		return generic_pop_one(std::move(lock));
 	}
 
-	boost::optional<value_type> try_pop_one() {
+	std::optional<value_type> try_pop_one() {
 		auto lock = lock_type(m_mutex);
 		if (empty(m_container)) {
-			return boost::none;
+			return std::nullopt;
 		}
 		return generic_pop_one(std::move(lock));
 	}
