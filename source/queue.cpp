@@ -209,7 +209,7 @@ struct scope_guard {
 	}
 	
 	constexpr scope_guard(scope_guard && other) noexcept(std::is_nothrow_move_constructible<Function>{}):
-		function(	std::move(other.function)),
+		function(std::move(other.function)),
 		is_active(std::exchange(other.is_active, false))
 	{
 	}
@@ -229,10 +229,6 @@ private:
 	bool is_active;
 };
 
-template<typename Function>
-constexpr auto make_scope_guard(Function function) noexcept(std::is_nothrow_move_constructible<Function>{}) {
-	return scope_guard<Function>(std::move(function));
-}
 
 void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers, std::size_t bulk_size) {
 	std::atomic<std::uint64_t> largest_read(0);
@@ -260,8 +256,8 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 			return threads;
 		};
 		
+	auto update_atomic = [](auto & atomic, auto & local) { return scope_guard([&]{ atomic += local; }); };
 		
-		auto update_atomic = [](auto & atomic, auto & local) { return make_scope_guard([&]{ atomic += local; }); };
 		
 		// Each thread is either adding individual_data, or atomically adding all of
 		// bulk_data. The reader thread should only see units of individual_data or
