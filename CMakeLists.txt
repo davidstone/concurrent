@@ -64,6 +64,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 	set(COMPILE_OPTIONS
 		$<$<CONFIG:Debug>:-O1;-march=native>
 		$<$<CONFIG:Release>:-march=native>
+		"-g"
 		"-Weverything"
 		"-Werror"
 		"-Wno-c++98-compat"
@@ -94,6 +95,7 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 	set(COMPILE_OPTIONS
 		$<$<CONFIG:Debug>:-Og;-march=native>
 		$<$<CONFIG:Release>:-O3;-march=native>
+		"-g"
 		"-Wall"
 		"-Wextra"
 		"-Wpedantic"
