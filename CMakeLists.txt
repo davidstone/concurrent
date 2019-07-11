@@ -33,11 +33,11 @@ target_link_libraries(concurrent_queue INTERFACE
 
 if(MSVC)
 	target_compile_options(concurrent_queue INTERFACE
-		"/std:c++17"
+		"/std:c++latest"
 	)
 else()
 	target_compile_options(concurrent_queue INTERFACE
-		"-std=c++17"
+		"-std=c++2a"
 	)
 endif()
 
