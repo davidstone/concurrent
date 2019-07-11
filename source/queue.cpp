@@ -234,15 +234,8 @@ constexpr auto make_scope_guard(Function function) noexcept(std::is_nothrow_move
 	return scope_guard<Function>(std::move(function));
 }
 
-
-struct Reader {
-	std::size_t threads;
-	std::size_t cost_per_item;
-	std::size_t cost_per_batch;
-};
-
-void test_ordering(Reader const reader, std::size_t number_of_writers, std::size_t bulk_size) {
-	std::atomic<std::uint64_t> number_of_reads(0);
+void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers, std::size_t bulk_size) {
+	std::atomic<std::uint64_t> largest_read(0);
 	std::atomic<std::uint64_t> items_read(0);
 	std::atomic<std::uint64_t> number_of_writes(0);
 	
@@ -267,22 +260,20 @@ void test_ordering(Reader const reader, std::size_t number_of_writers, std::size
 			return threads;
 		};
 		
-		// `cost` is volatile to ensure that we generate a read from memory
-		auto wait = [](std::size_t const volatile cost) {
-			for (std::size_t n = 0; n != cost; ++n) {
-			}
-		};
 		
 		auto update_atomic = [](auto & atomic, auto & local) { return make_scope_guard([&]{ atomic += local; }); };
 		
 		// Each thread is either adding individual_data, or atomically adding all of
 		// bulk_data. The reader thread should only see units of individual_data or
 		// bulk_data, never a partial update.
-		auto const reader_threads = create_threads(reader.threads, [&]{
-			auto data = std::vector<int>{};
+		auto const reader_threads = create_threads(number_of_readers, [&]{
 
-			auto local_number_of_reads = std::uint64_t(0);
-			auto const update_number_of_reads = update_atomic(number_of_reads, local_number_of_reads);
+			auto local_largest_read = std::uint64_t(0);
+			auto const update_largest_read = scope_guard([&]{
+				auto temp = largest_read.load();
+				while (temp < local_largest_read and !largest_read.compare_exchange_weak(temp, local_largest_read)) {
+				}
+			});
 
 			auto local_items_read = std::uint64_t(0);
 			auto const update_items_read = update_atomic(items_read, local_items_read);
@@ -297,19 +288,16 @@ void test_ordering(Reader const reader, std::size_t number_of_writers, std::size
 			// than we wrote by not getting in one final read. To prevent that,
 			// we get one last read.
 			auto process_data = [&] {
-				++local_number_of_reads;
-				local_items_read += size(data);
-					if (*it == individual_data) {
-						++it;
-						wait(reader.cost_per_item);
-					} else {
+				auto const count = size(data);
+				local_largest_read = std::max(local_largest_read, static_cast<std::size_t>(count));
+				local_items_read += count;
+				for (auto it = begin(data); it != end(data);) {
 						for (auto const expected : bulk_data) {
 						CONCURRENT_TEST(it != end(data));
 						CONCURRENT_TEST(*it == expected);
 							++it;
 					}
 				}
-				wait(reader.cost_per_batch);
 			};
 			try {
 				while (true) {
@@ -340,7 +328,7 @@ void test_ordering(Reader const reader, std::size_t number_of_writers, std::size
 	CONCURRENT_TEST(items_read == number_of_writes * bulk_size);
 
 	auto const time_taken = boost::chrono::duration_cast<boost::chrono::microseconds>(end - start).count();
-	std::cout << "Millions of messages / second: " << static_cast<double>(items_read) / time_taken << '\n';
+	std::cout << "Largest number of elements on queue: " << largest_read.load() << '\n';
 }
 
 }	// namespace
@@ -350,8 +338,6 @@ int main(int argc, char ** argv) {
 	po::options_description description("Allowed options");
 	description.add_options()
 		("help", "produce help message")
-		("item-cost", po::value<std::size_t>()->default_value(0), "Amount of work it takes to process an item on the read side (independent of batch size), measured in reads of memory")
-		("batch-cost", po::value<std::size_t>()->default_value(0), "Amount work it takes to process a batch of items on the read side, measured in reads of memory. If there is no benefit from batching, this should be 0")
 		("readers", po::value<std::size_t>()->default_value(1), "Number of threads reading data (minimum of 1)")
 		("writers", po::value<std::size_t>()->default_value(1), "Number of threads writing data (minimum of 1)")
 		("batch-size", po::value<std::size_t>()->default_value(2000), "Number of elements the writers are adding at a time")
@@ -366,8 +352,6 @@ int main(int argc, char ** argv) {
 		return 0;
 	}
 	
-	auto const cost_per_item = options["item-cost"].as<std::size_t>();
-	auto const cost_per_batch = options["batch-cost"].as<std::size_t>();
 	auto const number_of_readers = options["readers"].as<std::size_t>();
 	auto const number_of_writers = options["writers"].as<std::size_t>();
 	auto const batch_size = options["batch-size"].as<std::size_t>();
@@ -390,6 +374,5 @@ int main(int argc, char ** argv) {
 	test_timeout();
 	test_blocking();
 	
-	auto const reader = Reader{number_of_readers, cost_per_item, cost_per_batch};
-	test_ordering(reader, number_of_writers, batch_size);
+	test_ordering(number_of_readers, number_of_writers, batch_size);
 }
