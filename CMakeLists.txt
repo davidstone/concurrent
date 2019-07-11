@@ -39,6 +39,9 @@ else()
 	target_compile_options(concurrent_queue INTERFACE
 		"-std=c++2a"
 	)
+	target_link_libraries(concurrent_queue INTERFACE
+		pthread
+	)
 endif()
 
 add_executable(concurrent_queue_test
