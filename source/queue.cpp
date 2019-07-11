@@ -324,7 +324,8 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 	CONCURRENT_TEST(items_read == number_of_writes * bulk_size);
 
 	auto const time_taken = boost::chrono::duration_cast<boost::chrono::microseconds>(end - start).count();
-	std::cout << "Largest number of elements on queue: " << largest_read.load() << '\n';
+	std::cout << static_cast<double>(items_read) / time_taken << " million messages / second\n";
+	std::cout << largest_read.load() << " peak elements on queue\n";
 }
 
 }	// namespace
