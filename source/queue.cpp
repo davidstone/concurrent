@@ -10,10 +10,28 @@
 
 #include <algorithm>
 #include <array>
-#include <cassert>
 #include <iostream>
 #include <numeric>
 #include <string>
+
+#include <containers/vector.hpp>
+#include <containers/stable_vector.hpp>
+#include <vector>
+
+#if defined NDEBUG
+	#define CONCURRENT_NDEBUG_WAS_DEFINED NDEBUG
+	#undef NDEBUG
+#endif
+
+#include <cassert>
+
+// Like assert, but always evaluated
+#define CONCURRENT_TEST assert
+
+#if defined CONCURRENT_NDEBUG_WAS_DEFINED
+	#define NDEBUG CONCURRENT_NDEBUG_WAS_DEFINED
+	#undef CONCURRENT_NDEBUG_WAS_DEFINED
+#endif
 
 namespace {
 
@@ -22,12 +40,12 @@ void test_int() {
 	queue.emplace(0);
 	queue.push(7);
 	auto const first_values = queue.pop_all();
-	assert(size(first_values) == 2);
-	assert(first_values[0] == 0);
-	assert(first_values[1] == 7);
+	CONCURRENT_TEST(size(first_values) == 2);
+	CONCURRENT_TEST(first_values[0] == 0);
+	CONCURRENT_TEST(first_values[1] == 7);
 	queue.push(4);
 	auto const second_values = queue.pop_all();
-	assert(size(second_values) == 1);
+	CONCURRENT_TEST(size(second_values) == 1);
 }
 
 // Tests ranges and conversions
@@ -43,7 +61,7 @@ void test_string() {
 	auto const expected = std::array<char const *, 4>{
 		"Reese", "Finch", "Carter", "Fusco"
 	};
-	assert(std::equal(values.begin(), values.end(), expected.begin(), expected.end()));
+	CONCURRENT_TEST(std::equal(values.begin(), values.end(), expected.begin(), expected.end()));
 }
 
 
@@ -102,11 +120,11 @@ void test_copy_move() {
 	auto expected_copy_constructed = static_cast<std::size_t>(0);
 	auto expected_move_constructed = static_cast<std::size_t>(0);
 	auto check_all = [&]{
-		assert(copy_move_counter::default_constructed() == expected_default_constructed);
-		assert(copy_move_counter::copy_constructed() == expected_copy_constructed);
-		assert(copy_move_counter::move_constructed() == expected_move_constructed);
-		assert(copy_move_counter::copy_assigned() == 0);
-		assert(copy_move_counter::move_assigned() == 0);
+		CONCURRENT_TEST(copy_move_counter::default_constructed() == expected_default_constructed);
+		CONCURRENT_TEST(copy_move_counter::copy_constructed() == expected_copy_constructed);
+		CONCURRENT_TEST(copy_move_counter::move_constructed() == expected_move_constructed);
+		CONCURRENT_TEST(copy_move_counter::copy_assigned() == 0);
+		CONCURRENT_TEST(copy_move_counter::move_assigned() == 0);
 	};
 
 	check_all();
@@ -149,19 +167,19 @@ void test_timeout() {
 	auto const values_duration = queue.pop_all(duration);
 	auto const after_duration = now();
 
-	assert(after_time_point - before_time_point >= duration);
-	assert(after_duration - after_time_point >= duration);
+	CONCURRENT_TEST(after_time_point - before_time_point >= duration);
+	CONCURRENT_TEST(after_duration - after_time_point >= duration);
 
-	assert(empty(values_time_point));
-	assert(empty(values_duration));
+	CONCURRENT_TEST(empty(values_time_point));
+	CONCURRENT_TEST(empty(values_duration));
 	
 	queue.push(0);
 	auto const should_be_fast = queue.pop_all(boost::chrono::hours(24 * 365));
-	assert(size(should_be_fast) == 1);
-	assert(should_be_fast[0] == 0);
+	CONCURRENT_TEST(size(should_be_fast) == 1);
+	CONCURRENT_TEST(should_be_fast[0] == 0);
 	
 	auto const immediate = queue.try_pop_all();
-	assert(empty(immediate));
+	CONCURRENT_TEST(empty(immediate));
 }
 
 
@@ -177,9 +195,9 @@ void test_blocking() {
 		queue.emplace(value);
 	});
 	auto const result = queue.pop_all();
-	assert(now() >= time_to_wake_up);
-	assert(size(result) == 1);
-	assert(result.front() == value);
+	CONCURRENT_TEST(now() >= time_to_wake_up);
+	CONCURRENT_TEST(size(result) == 1);
+	CONCURRENT_TEST(result.front() == value);
 }
 
 template<typename Function>
@@ -286,11 +304,9 @@ void test_ordering(Reader const reader, std::size_t number_of_writers, std::size
 						wait(reader.cost_per_item);
 					} else {
 						for (auto const expected : bulk_data) {
-							assert(it != data.end());
-							assert(*it == expected);
+						CONCURRENT_TEST(it != end(data));
+						CONCURRENT_TEST(*it == expected);
 							++it;
-							wait(reader.cost_per_item);
-						}
 					}
 				}
 				wait(reader.cost_per_batch);
@@ -321,7 +337,7 @@ void test_ordering(Reader const reader, std::size_t number_of_writers, std::size
 
 	auto const end = now();
 	
-	assert(items_read == number_of_writes * bulk_size);
+	CONCURRENT_TEST(items_read == number_of_writes * bulk_size);
 
 	auto const time_taken = boost::chrono::duration_cast<boost::chrono::microseconds>(end - start).count();
 	std::cout << "Millions of messages / second: " << static_cast<double>(items_read) / time_taken << '\n';
