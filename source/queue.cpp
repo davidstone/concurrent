@@ -10,12 +10,10 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <iostream>
 #include <numeric>
 #include <string>
-
-#include <containers/vector.hpp>
-#include <containers/stable_vector.hpp>
 #include <vector>
 
 #if defined NDEBUG
@@ -29,7 +27,6 @@
 #define CONCURRENT_TEST assert
 
 #if defined CONCURRENT_NDEBUG_WAS_DEFINED
-	#define NDEBUG CONCURRENT_NDEBUG_WAS_DEFINED
 	#undef CONCURRENT_NDEBUG_WAS_DEFINED
 #endif
 
@@ -237,7 +234,7 @@ template<typename T>
 void reserve(Container<T> & v) {
 	v.reserve(static_cast<typename Container<T>::size_type>(reserved_size));
 }
-#endif
+
 void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers, std::size_t bulk_size) {
 	std::atomic<std::uint64_t> largest_read(0);
 	std::atomic<std::uint64_t> items_read(0);
@@ -335,7 +332,7 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 	CONCURRENT_TEST(items_read == number_of_writes * bulk_size);
 
 	auto const time_taken = boost::chrono::duration_cast<boost::chrono::microseconds>(end - start).count();
-	std::cout << static_cast<double>(items_read) / time_taken << " million messages / second\n";
+	std::cout << static_cast<double>(items_read) / static_cast<double>(time_taken) << " million messages / second\n";
 	std::cout << largest_read.load() << " peak elements on queue\n";
 }
 

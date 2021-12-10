@@ -74,6 +74,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 		"-Wno-c++98-compat-pedantic"
 		# -Wmissing-braces wants two sets of braces when using constructs such
 		# as std::array
+		"-Wno-ctad-maybe-unsupported"
 		"-Wno-missing-braces"
 		"-Wno-newline-eof"
 		"-Wno-padded"
