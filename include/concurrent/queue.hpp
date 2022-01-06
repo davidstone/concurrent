@@ -19,7 +19,6 @@
 #include <utility>
 #include <vector>
 
-namespace boost {
 namespace concurrent {
 namespace detail {
 
@@ -176,7 +175,7 @@ struct basic_queue_impl {
 	}
 	auto size() const {
 		auto lock = lock_type(m_mutex);
-		return boost::concurrent::detail::size(m_container);
+		return ::concurrent::detail::size(m_container);
 	}
 
 private:
@@ -319,7 +318,7 @@ private:
 	container_type generic_pop_all(lock_type lock, container_type storage) {
 		using std::swap;
 		swap(m_container, storage);
-		derived().handle_remove_all(boost::concurrent::detail::size(storage));
+		derived().handle_remove_all(::concurrent::detail::size(storage));
 		lock.unlock();
 		return storage;
 	}
@@ -507,5 +506,4 @@ private:
 template<typename T, typename Allocator = std::allocator<T>>
 using dropping_queue = basic_dropping_queue<std::vector<T, Allocator>>;
 
-}	// namespace concurrent
-}	// namespace boost
+} // namespace concurrent

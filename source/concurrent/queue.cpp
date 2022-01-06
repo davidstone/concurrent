@@ -3,7 +3,7 @@
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-#include <boost/concurrent/queue.hpp>
+#include <concurrent/queue.hpp>
 
 #include <boost/program_options.hpp>
 #include <boost/thread/scoped_thread.hpp>
@@ -33,7 +33,7 @@
 namespace {
 
 void test_int() {
-	auto queue = boost::concurrent::unbounded_queue<int>{};
+	auto queue = concurrent::unbounded_queue<int>{};
 	queue.emplace(0);
 	queue.push(7);
 	auto const first_values = queue.pop_all();
@@ -47,7 +47,7 @@ void test_int() {
 
 // Tests ranges and conversions
 void test_string() {
-	auto queue = boost::concurrent::unbounded_queue<std::string>{};
+	auto queue = concurrent::unbounded_queue<std::string>{};
 	queue.emplace("Reese");
 	queue.push("Finch");
 	char const * array[] = {
@@ -112,7 +112,7 @@ private:
 void test_copy_move() {
 	// Some of these tests will fail if the standard library implementation
 	// makes unnecessary copies / moves.
-	auto queue = boost::concurrent::unbounded_queue<copy_move_counter>{};
+	auto queue = concurrent::unbounded_queue<copy_move_counter>{};
 	auto expected_default_constructed = static_cast<std::size_t>(0);
 	auto expected_copy_constructed = static_cast<std::size_t>(0);
 	auto expected_move_constructed = static_cast<std::size_t>(0);
@@ -157,7 +157,7 @@ auto now() {
 auto const duration = boost::chrono::milliseconds(100);
 
 void test_timeout() {
-	auto queue = boost::concurrent::unbounded_queue<int>{};
+	auto queue = concurrent::unbounded_queue<int>{};
 	auto const before_time_point = now();
 	auto const values_time_point = queue.pop_all(before_time_point + duration);
 	auto const after_time_point = now();
@@ -184,7 +184,7 @@ void test_timeout() {
 using thread_t = boost::scoped_thread<boost::interrupt_and_join_if_joinable>;
 
 void test_blocking() {
-	auto queue = boost::concurrent::unbounded_queue<int>{};
+	auto queue = concurrent::unbounded_queue<int>{};
 	auto const value = 6;
 	auto const time_to_wake_up = now() + duration;
 	auto thread = thread_t([&]{
@@ -260,7 +260,7 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 		
 	auto update_atomic = [](auto & atomic, auto & local) { return scope_guard([&]{ atomic += local; }); };
 		
-	auto queue = boost::concurrent::basic_unbounded_queue<Container<value_type>>{};
+	auto queue = concurrent::basic_unbounded_queue<Container<value_type>>{};
 	queue.reserve(static_cast<Container<value_type>::size_type>(reserved_size));
 		
 	auto const start = now();

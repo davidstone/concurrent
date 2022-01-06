@@ -15,7 +15,7 @@ enable_testing()
 add_library(concurrent_queue INTERFACE)
 
 target_sources(concurrent_queue INTERFACE
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include/boost/concurrent/queue.hpp
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include/concurrent/queue.hpp
 )
 
 target_include_directories(concurrent_queue INTERFACE
@@ -45,11 +45,15 @@ else()
 endif()
 
 add_executable(concurrent_queue_test
-	source/queue.cpp
+	source/concurrent/queue.cpp
 )
 
 target_link_libraries(concurrent_queue_test
 	concurrent_queue
+)
+
+target_link_options(concurrent_queue_test PUBLIC
+	"-fuse-ld=lld"
 )
 
 function(set_sanitizers target)

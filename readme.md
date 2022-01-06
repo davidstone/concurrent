@@ -2,8 +2,6 @@
 
 If you have multiple threads that need to communicate, you need some way to do so safely and efficiently. A thread-safe queue allows you to do this. In this model, one or more threads are "producer" or "writer" threads, and one or more threads are "consumer" or "reader" threads.
 
-Note: This is not an official Boost library. I am proposing it for addition into Boost.
-
 # Highlights
 
 * The bulk interface is faster than other queues for many common load patterns
@@ -16,15 +14,15 @@ Note: This is not an official Boost library. I am proposing it for addition into
 
 # Tutorial / Quick start
 
-This is a sample program that has two producer threads that are generating the numbers from 0 to 9 and one reader thread that prints the numbers as it sees them. This demonstrates typical usage of a `boost::concurrent::unbounded_queue`.
+This is a sample program that has two producer threads that are generating the numbers from 0 to 9 and one reader thread that prints the numbers as it sees them. This demonstrates typical usage of a `concurrent::unbounded_queue`.
 
-	#include <boost/concurrent/queue.hpp>
-	#include <boost/thread/scoped_thread.hpp>
+	#include <concurrent/queue.hpp>
+	#include <thread/scoped_thread.hpp>
 
 	using thread_t = boost::scoped_thread<boost::interrupt_and_join_if_joinable>;
 
 	struct producer_t {
-		explicit producer_t(boost::concurrent::unbounded_queue<int> & queue):
+		explicit producer_t(concurrent::unbounded_queue<int> & queue):
 			thread([&]{
 				for (int n = 0; n != 10; ++n) {
 					queue.push(n);
@@ -37,7 +35,7 @@ This is a sample program that has two producer threads that are generating the n
 	};
 
 	struct consumer_t {
-		explicit consumer_t(boost::concurrent::unbounded_queue<int> & queue):
+		explicit consumer_t(concurrent::unbounded_queue<int> & queue):
 			thread([&]{
 				while (true) {
 					for (int const value : queue.pop_all()) {
@@ -53,7 +51,7 @@ This is a sample program that has two producer threads that are generating the n
 	};
 
 	int main() {
-		auto queue = boost::concurrent::unbounded_queue<int>{};
+		auto queue = concurrent::unbounded_queue<int>{};
 		auto consumer = consumer_t(queue);
 		auto producers = std::array<producer_t, 2>{
 			producer_t(queue),
@@ -105,9 +103,9 @@ The output of the queue is guaranteed to be sequentially consistent with the inp
 The call to `push` has the same rules around when memory is allocated as `std::vector`. This means that most of the time, push is quick, but sometimes, it is very slow. It is not good for code to be slow inside your lock, as this will dramatically reduce your concurrency. What can we do to minimize these memory allocations? We can slightly change how we write our code on the consumer side, when we call `pop_all`. If we change our consumer thread to look like this:
 
 	struct consumer_t {
-		explicit consumer_t(boost::concurrent::unbounded_queue<int> & queue):
+		explicit consumer_t(concurrent::unbounded_queue<int> & queue):
 			thread([&]{
-				auto buffer = boost::concurrent::unbounded_queue<int>::container_type{};
+				auto buffer = concurrent::unbounded_queue<int>::container_type{};
 				while (true) {
 					buffer = queue.pop_all(std::move(buffer));
 					for (int const value : buffer) {
