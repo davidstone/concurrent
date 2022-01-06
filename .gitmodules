@@ -1,0 +1,3 @@
+[submodule "dependencies/cmake_strict_defaults"]
+	path = dependencies/cmake_strict_defaults
+	url = https://github.com/davidstone/cmake_strict_defaults
