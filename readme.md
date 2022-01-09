@@ -112,6 +112,7 @@ The call to `push` has the same rules around when memory is allocated as `std::v
 						std::cout << value << ' ';
 					}
 					std::cout << '\n';
+					buffer.clear();
 				}
 			})
 		{
