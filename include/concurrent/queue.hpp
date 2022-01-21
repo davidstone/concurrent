@@ -162,20 +162,20 @@ struct basic_queue_impl {
 
 	void clear() {
 		auto const lock = lock_type(m_mutex);
-		auto const previous_size = size(m_container);
+		auto const previous_size = detail::size(m_container);
 		m_container.clear();
 		derived().handle_remove_all(previous_size);
 	}
 
 
-	template<typename Size>
-	void reserve(Size const size) {
+	template<typename Capacity>
+	void reserve(Capacity const new_capacity) {
 		auto lock = lock_type(m_mutex);
-		m_container.reserve(size);
+		m_container.reserve(new_capacity);
 	}
 	auto size() const {
 		auto lock = lock_type(m_mutex);
-		return ::concurrent::detail::size(m_container);
+		return detail::size(m_container);
 	}
 
 private:
@@ -318,14 +318,14 @@ private:
 	container_type generic_pop_all(lock_type lock, container_type storage) {
 		using std::swap;
 		swap(m_container, storage);
-		derived().handle_remove_all(::concurrent::detail::size(storage));
+		derived().handle_remove_all(detail::size(storage));
 		lock.unlock();
 		return storage;
 	}
 
 	// lock must be in the locked state
 	value_type generic_pop_one(lock_type lock) {
-		auto const previous_size = size(m_container);
+		auto const previous_size = detail::size(m_container);
 		auto result = std::move(m_container.front());
 		m_container.pop_front();
 		derived().handle_remove_one(previous_size);
@@ -425,7 +425,7 @@ private:
 	friend base;
 
 	void handle_add(Container & queue, boost::unique_lock<boost::mutex> & lock) {
-		m_notify_removal.wait(lock, [&]{ return size(queue) < m_max_size; });
+		m_notify_removal.wait(lock, [&]{ return detail::size(queue) < m_max_size; });
 	}
 	void handle_remove_all(typename Container::size_type const previous_size) {
 		if (previous_size >= max_size()) {
@@ -487,11 +487,11 @@ private:
 	friend base;
 
 	auto handle_add(Container & queue, boost::unique_lock<boost::mutex> &) {
-		if (size(queue) < max_size())
+		if (detail::size(queue) < max_size())
 		{
 			return static_cast<typename Container::size_type>(0);
 		}
-		auto const skipped = size(queue);
+		auto const skipped = detail::size(queue);
 		queue.clear();
 		return skipped;
 	}
