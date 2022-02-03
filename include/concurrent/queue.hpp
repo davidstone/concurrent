@@ -52,9 +52,9 @@ struct basic_queue_impl {
 	// This will also optimize memory usage, as the underlying container can
 	// reserve all the space it needs.
 	template<typename InputIterator, typename Sentinel>
-	decltype(auto) append(InputIterator const first, Sentinel const last) {
+	auto append(InputIterator const first, Sentinel const last) -> void {
 		constexpr auto adding_several = std::true_type{};
-		return generic_add(adding_several, [&]{ m_container.insert(m_container.end(), first, last); });
+		generic_add(adding_several, [&]{ m_container.insert(m_container.end(), first, last); });
 	}
 
 	template<typename InputIterator, typename Sentinel>
@@ -64,15 +64,15 @@ struct basic_queue_impl {
 	}
 
 	template<typename... Args>
-	decltype(auto) emplace(Args && ... args) {
+	auto emplace(Args && ... args) -> void {
 		constexpr auto adding_several = std::false_type{};
-		return generic_add(adding_several, [&]{ m_container.emplace_back(std::forward<Args>(args)...); });
+		generic_add(adding_several, [&]{ m_container.emplace_back(std::forward<Args>(args)...); });
 	}
-	decltype(auto) push(value_type && value) {
-		return emplace(std::move(value));
+	auto push(value_type && value) -> void {
+		emplace(std::move(value));
 	}
-	decltype(auto) push(value_type const & value) {
-		return emplace(value);
+	auto push(value_type const & value) -> void {
+		emplace(value);
 	}
 
 	template<typename... Args>
@@ -204,52 +204,14 @@ private:
 	}
 
 
-
 	Derived & derived() {
 		return static_cast<Derived &>(*this);
 	}
 
 
-
-	// Until we can get something like this proposal
-	// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0146r1.html
-	// we require multiple levels of template indirection with empty_t,
-	// wrap_void, and unwrap_forward
-
-	enum class empty_t {};
-
-	// TODO: implement this with if constexpr
-	template<typename Function, typename std::enable_if<!std::is_void<decltype(std::declval<Function>()())>::value, empty_t>::type = empty_t{}>
-	static decltype(auto) wrap_void(Function function) {
-		return function();
-	}
-	template<typename Function, typename std::enable_if<std::is_void<decltype(std::declval<Function>()())>::value, empty_t>::type = empty_t{}>
-	static decltype(auto) wrap_void(Function function) {
-		function();
-		return empty_t{};
-	}
-	
-	template<typename>
-	static void unwrap_forward(empty_t) {
-	}
-	template<typename T, typename Arg>
-	static decltype(auto) unwrap_forward(Arg && value) {
-		// std::forward always returns a reference. We want to return a value if
-		// handle_add returns by value. This means we need to static cast to the
-		// correct type so that the decltype(auto) return type picks it up.
-		// However, if we do not forward and the function returns by value, we
-		// will always copy. If there were implicit moves from local rvalue
-		// references, we wouldn't need to do anything here and we could just
-		// return result.
-		//
-		// This change to the standard is proposed in
-		// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0527r0.html
-		return static_cast<T>(std::forward<T>(value));
-	}
-
 	template<typename Bool, typename Function>
-	decltype(auto) generic_add(Bool const adding_several, Function && add) {
-		return generic_add_impl(adding_several, lock_type(m_mutex), add);
+	auto generic_add(Bool const adding_several, Function && add) -> void {
+		generic_add_impl(adding_several, lock_type(m_mutex), add);
 	}
 
 	template<typename Bool, typename Function>
@@ -263,8 +225,8 @@ private:
 	}
 
 	template<typename Bool, typename Function>
-	decltype(auto) generic_add_impl(Bool const adding_several, lock_type lock, Function && add) {
-		decltype(auto) result = wrap_void([&]() -> decltype(auto) { return derived().handle_add(m_container, lock); });
+	auto generic_add_impl(Bool const adding_several, lock_type lock, Function && add) -> void {
+		derived().handle_add(m_container, lock);
 		auto const was_empty = empty(m_container);
 		add();
 		lock.unlock();
@@ -306,11 +268,6 @@ private:
 				m_notify_addition.notify_one();
 			}
 		}
-		using add_result_type = decltype(std::declval<Derived &>().handle_add(
-				std::declval<Container &>(),
-				std::declval<lock_type &>()
-		));
-		return unwrap_forward<add_result_type>(result);
 	}
 
 
@@ -444,66 +401,5 @@ private:
 
 template<typename T, typename Allocator = std::allocator<T>>
 using blocking_queue = basic_blocking_queue<std::vector<T, Allocator>>;
-
-
-
-// dropping_queue has a max_size. If the queue contains at least max_size()
-// elements after data is added, the queue will instead be emptied.
-template<typename Container>
-struct basic_dropping_queue : private detail::basic_queue_impl<Container, basic_dropping_queue<Container>> {
-private:
-	using base = detail::basic_queue_impl<Container, basic_dropping_queue<Container>>;
-public:
-	using typename base::container_type;
-	using typename base::value_type;
-
-	explicit basic_dropping_queue(typename Container::size_type const max_size_):
-		m_max_size(max_size_)
-	{
-	}
-
-	auto max_size() const {
-		return m_max_size;
-	}
-
-	using base::append;
-	using base::non_blocking_append;
-	using base::emplace;
-	using base::non_blocking_emplace;
-	using base::push;
-	using base::non_blocking_push;
-
-	using base::pop_all;
-	using base::try_pop_all;
-	using base::pop_one;
-	using base::try_pop_one;
-
-	using base::clear;
-
-	using base::reserve;
-	using base::size;
-
-private:
-	friend base;
-
-	auto handle_add(Container & queue, boost::unique_lock<boost::mutex> &) {
-		if (detail::size(queue) < max_size())
-		{
-			return static_cast<typename Container::size_type>(0);
-		}
-		auto const skipped = detail::size(queue);
-		queue.clear();
-		return skipped;
-	}
-	void handle_remove_all(typename Container::size_type) {
-	}
-	void handle_remove_one(typename Container::size_type) {
-	}
-
-	typename Container::size_type m_max_size;
-};
-
-template<typename T, typename Allocator = std::allocator<T>>
-using dropping_queue = basic_dropping_queue<std::vector<T, Allocator>>;
 
 } // namespace concurrent

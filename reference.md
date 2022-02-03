@@ -4,8 +4,6 @@ You may want to consult [the tutorial](readme.md).
 
 # Queues supported
 
-There are three types of queues provided by the concurrent library: `basic_unbounded_queue`, `basic_blocking_queue`, and `basic_dropping_queue`. These queues all have different behavior when the user attempts to add elements but the queue is  already full.
-
 ## basic_unbounded_queue
 
 	template<typename Container>
@@ -25,16 +23,6 @@ There are three types of queues provided by the concurrent library: `basic_unbou
 	using blocking_queue = basic_blocking_queue<std::vector<T, Allocator>>;
 
 `basic_blocking_queue` accepts a size parameter in its constructor. If the queue already has at least `max_size` elements when the user attempts to add data (by calling `append`, `emplace`, or `push`), that call will block until the queue is reduced in size to have fewer than `max_size` elements.
-
-## basic_dropping_queue
-
-	template<typename Container>
-	struct basic_dropping_queue;
-	
-	template<typename T, typename Allocator = std::allocator<T>>
-	using dropping_queue = basic_dropping_queue<std::vector<T, Allocator>>;
-
-`basic_dropping_queue` accepts a size parameter in its constructor. If the queue already has at least `max_size` elements when the user attempts to add data (by calling `append`, `emplace`, or `push`), the queue is first cleared so that it has 0 elements, then the new elements are added.
 
 # Reference
 
@@ -67,7 +55,7 @@ The behavior of any function which accepts a `time_point` or `duration` paramete
 
 | Function | Definition |
 | :--------- | :--------- |
-| constructor | `basic_unbounded_queue` is default constructible. This constructs an empty queue. `basic_blocking_queue` and `basic_dropping_queue` are constructible from `container_type::size_type`. This constructs an empty queue and sets the `max_size` to that value. |
+| constructor | `basic_unbounded_queue` is default constructible. This constructs an empty queue. `basic_blocking_queue` is constructible from `container_type::size_type`. This constructs an empty queue and sets the `max_size` to that value. |
 | move constructor | Moves the contents of the queue and the `max_size` (if present) from the old queue to the new queue. Not thread safe, as the assumption is that the source of the move is a temporary. Only defined if `container_type` is [MoveConstructible](http://en.cppreference.com/w/cpp/concept/MoveConstructible) |
 | copy constructor | Deleted |
 | move assignment | Deleted |
@@ -85,7 +73,7 @@ Adds elements to the underlying container by calling `container.insert(container
 
 This should be preferred over `emplace` or `push` where possible, as it typically leads to better performance.
 
-Returns the number of elements dropped for `basic_dropping_queue`, otherwise returns `void`.
+Returns `void`.
 
 Elements added to the queue by this operation are guaranteed to be added atomically. No other elements will be added in the middle, and if a consumer pops everything off the queue, they will either see all of the elements in the range or none of them.
 
@@ -100,7 +88,7 @@ Elements added to the queue by this operation are guaranteed to be added atomica
 
 #### Definition
 
-Adds an element to the underlying container by calling `container.emplace_back(std::forward<Args>(args)...)`. Returns the number of elements dropped for `basic_dropping_queue`, otherwise returns `void`.
+Adds an element to the underlying container by calling `container.emplace_back(std::forward<Args>(args)...)`. Returns `void`.
 
 #### Requirements
 
@@ -275,7 +263,7 @@ Returns the maximum size of the queue.
 
 #### Requirements
 
-`max_size` is only defined for `basic_blocking_queue` and `basic_dropping_queue`, not for `basic_unbounded_queue`. `container_type::size_type` must model the [CopyConstructible](http://en.cppreference.com/w/cpp/concept/CopyConstructible) concept. The behavior is undefined if the copy constructor of `container_type::size_type` calls any member functions on this queue object.
+`max_size` is defined only for `basic_blocking_queue`, not for `basic_unbounded_queue`. `container_type::size_type` must model the [CopyConstructible](http://en.cppreference.com/w/cpp/concept/CopyConstructible) concept. The behavior is undefined if the copy constructor of `container_type::size_type` calls any member functions on this queue object.
 
 
 # Supported Compilers
