@@ -336,8 +336,8 @@ private:
 	}
 };
 
-template<typename T, typename Allocator = std::allocator<T>>
-using unbounded_queue = basic_unbounded_queue<std::vector<T, Allocator>>;
+template<typename T>
+using unbounded_queue = basic_unbounded_queue<std::vector<T>>;
 
 
 
@@ -399,7 +399,7 @@ private:
 	boost::condition_variable m_notify_removal;
 };
 
-template<typename T, typename Allocator = std::allocator<T>>
-using blocking_queue = basic_blocking_queue<std::vector<T, Allocator>>;
+template<typename T>
+using blocking_queue = basic_blocking_queue<std::vector<T>>;
 
 } // namespace concurrent
