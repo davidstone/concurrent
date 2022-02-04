@@ -38,8 +38,10 @@ inline constexpr auto empty = [](auto && range) {
 	return empty(range);
 };
 
+template<typename Mutex>
+using condition_variable = std::conditional_t<std::is_same_v<Mutex, boost::mutex>, boost::condition_variable, boost::condition_variable_any>;
 
-template<typename Container, typename Derived>
+template<typename Container, typename Mutex, typename Derived>
 struct basic_queue_impl {
 	using container_type = Container;
 	using value_type = typename Container::value_type;
@@ -179,7 +181,7 @@ struct basic_queue_impl {
 	}
 
 private:
-	using lock_type = boost::unique_lock<boost::mutex>;
+	using lock_type = boost::unique_lock<Mutex>;
 
 	auto is_not_empty() const {
 		return [&]{ return !empty(m_container); };
@@ -291,17 +293,17 @@ private:
 	}
 
 	container_type m_container;
-	mutable boost::mutex m_mutex;
-	boost::condition_variable m_notify_addition;
+	mutable Mutex m_mutex;
+	detail::condition_variable<Mutex> m_notify_addition;
 };
 
 }	// namespace detail
 
 // basic_unbounded_queue is limited only by the available memory on the system
-template<typename Container>
-struct basic_unbounded_queue : private detail::basic_queue_impl<Container, basic_unbounded_queue<Container>> {
+template<typename Container, typename Mutex = boost::mutex>
+struct basic_unbounded_queue : private detail::basic_queue_impl<Container, Mutex, basic_unbounded_queue<Container, Mutex>> {
 private:
-	using base = detail::basic_queue_impl<Container, basic_unbounded_queue<Container>>;
+	using base = detail::basic_queue_impl<Container, Mutex, basic_unbounded_queue<Container, Mutex>>;
 public:
 	using typename base::container_type;
 	using typename base::value_type;
@@ -328,7 +330,7 @@ public:
 private:
 	friend base;
 
-	void handle_add(Container &, boost::unique_lock<boost::mutex> &) {
+	void handle_add(Container &, boost::unique_lock<Mutex> &) {
 	}
 	void handle_remove_all(typename Container::size_type) {
 	}
@@ -336,18 +338,18 @@ private:
 	}
 };
 
-template<typename T>
-using unbounded_queue = basic_unbounded_queue<std::vector<T>>;
+template<typename T, typename Mutex = boost::mutex>
+using unbounded_queue = basic_unbounded_queue<std::vector<T>, boost::mutex>;
 
 
 
 // blocking_queue has a max_size. If the queue contains at least max_size()
 // elements when attempting to add data, the call will block until the size is
 // less than max_size().
-template<typename Container>
-struct basic_blocking_queue : private detail::basic_queue_impl<Container, basic_blocking_queue<Container>> {
+template<typename Container, typename Mutex = boost::mutex>
+struct basic_blocking_queue : private detail::basic_queue_impl<Container, Mutex, basic_blocking_queue<Container, Mutex>> {
 private:
-	using base = detail::basic_queue_impl<Container, basic_blocking_queue<Container>>;
+	using base = detail::basic_queue_impl<Container, Mutex, basic_blocking_queue<Container, Mutex>>;
 public:
 	using typename base::container_type;
 	using typename base::value_type;
@@ -381,7 +383,7 @@ public:
 private:
 	friend base;
 
-	void handle_add(Container & queue, boost::unique_lock<boost::mutex> & lock) {
+	void handle_add(Container & queue, boost::unique_lock<Mutex> & lock) {
 		m_notify_removal.wait(lock, [&]{ return detail::size(queue) < m_max_size; });
 	}
 	void handle_remove_all(typename Container::size_type const previous_size) {
@@ -396,10 +398,10 @@ private:
 	}
 
 	typename Container::size_type m_max_size;
-	boost::condition_variable m_notify_removal;
+	detail::condition_variable<Mutex> m_notify_removal;
 };
 
-template<typename T>
-using blocking_queue = basic_blocking_queue<std::vector<T>>;
+template<typename T, typename Mutex = boost::mutex>
+using blocking_queue = basic_blocking_queue<std::vector<T>, Mutex>;
 
 } // namespace concurrent
