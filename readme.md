@@ -16,110 +16,120 @@ If you have multiple threads that need to communicate, you need some way to do s
 
 This is a sample program that has two producer threads that are generating the numbers from 0 to 9 and one reader thread that prints the numbers as it sees them. This demonstrates typical usage of a `concurrent::unbounded_queue`.
 
-	#include <concurrent/queue.hpp>
-	#include <thread/scoped_thread.hpp>
+```
+#include <concurrent/queue.hpp>
+#include <thread/scoped_thread.hpp>
 
-	using thread_t = boost::scoped_thread<boost::interrupt_and_join_if_joinable>;
+using thread_t = boost::scoped_thread<boost::interrupt_and_join_if_joinable>;
 
-	struct producer_t {
-		explicit producer_t(concurrent::unbounded_queue<int> & queue):
-			thread([&]{
-				for (int n = 0; n != 10; ++n) {
-					queue.push(n);
-				}
-			})
-		{
-		}
-	private:
-		thread_t thread;
-	};
-
-	struct consumer_t {
-		explicit consumer_t(concurrent::unbounded_queue<int> & queue):
-			thread([&]{
-				while (true) {
-					for (int const value : queue.pop_all()) {
-						std::cout << value << ' ';
-					}
-					std::cout << '\n';
-				}
-			})
-		{
-		}
-	private:
-		thread_t thread;
-	};
-
-	int main() {
-		auto queue = concurrent::unbounded_queue<int>{};
-		auto consumer = consumer_t(queue);
-		auto producers = std::array<producer_t, 2>{
-			producer_t(queue),
-			producer_t(queue)
-		};
+struct producer_t {
+	explicit producer_t(concurrent::unbounded_queue<int> & queue):
+		thread([&]{
+			for (int n = 0; n != 10; ++n) {
+				queue.push(n);
+			}
+		})
+	{
 	}
+private:
+	thread_t thread;
+};
+
+struct consumer_t {
+	explicit consumer_t(concurrent::unbounded_queue<int> & queue):
+		thread([&]{
+			while (true) {
+				for (int const value : queue.pop_all()) {
+					std::cout << value << ' ';
+				}
+				std::cout << '\n';
+			}
+		})
+	{
+	}
+private:
+	thread_t thread;
+};
+
+int main() {
+	auto queue = concurrent::unbounded_queue<int>();
+	auto consumer = consumer_t(queue);
+	auto producers = std::array<producer_t, 2>{
+		producer_t(queue),
+		producer_t(queue)
+	};
+}
+```
 
 If you run this program, you might see output like this:
 
-	0 1 2 3 4 5 6 7 8 9 
-	0 1 2 3 4 5 6 7 8 9 
+```
+0 1 2 3 4 5 6 7 8 9 
+0 1 2 3 4 5 6 7 8 9 
+```
 
 Or this:
 
-	0 
-	1 
-	2 
-	3 
-	4 
-	5 
-	6 
-	7 
-	8 
-	9 
-	0 
-	1 
-	2 
-	3 
-	4 
-	5 
-	6 
-	7 
-	8 
-	9 
+```
+0 
+1 
+2 
+3 
+4 
+5 
+6 
+7 
+8 
+9 
+0 
+1 
+2 
+3 
+4 
+5 
+6 
+7 
+8 
+9 
+```
 
 Or something in the middle like this:
 
-	0 1 2 3 4 
-	5 0 1 6 7 2 8 
-	3 4 5 6 
-	7 
-	8 
-	9 9
+```
+0 1 2 3 4 
+5 0 1 6 7 2 8 
+3 4 5 6 
+7 
+8 
+9 9
+```
 
-The output of the queue is guaranteed to be sequentially consistent with the input. This means that elements that a single thread adds to the queue first will be removed first. If two threads have any sort of sequencing guarantees, the queue will respect that.
+The output of the queue is guaranteed to be consistent with the input. This means that elements that a single thread adds to the queue first will be removed first. If two threads have any sort of sequencing guarantees, the queue will respect that.
 
 ## Optimizing your access
 
 The call to `push` has the same rules around when memory is allocated as `std::vector`. This means that most of the time, push is quick, but sometimes, it is very slow. It is not good for code to be slow inside your lock, as this will dramatically reduce your concurrency. What can we do to minimize these memory allocations? We can slightly change how we write our code on the consumer side, when we call `pop_all`. If we change our consumer thread to look like this:
 
-	struct consumer_t {
-		explicit consumer_t(concurrent::unbounded_queue<int> & queue):
-			thread([&]{
-				auto buffer = concurrent::unbounded_queue<int>::container_type{};
-				while (true) {
-					buffer = queue.pop_all(std::move(buffer));
-					for (int const value : buffer) {
-						std::cout << value << ' ';
-					}
-					std::cout << '\n';
-					buffer.clear();
+```
+struct consumer_t {
+	explicit consumer_t(concurrent::unbounded_queue<int> & queue):
+		thread([&]{
+			auto buffer = concurrent::unbounded_queue<int>::container_type();
+			while (true) {
+				buffer = queue.pop_all(std::move(buffer));
+				for (int const value : buffer) {
+					std::cout << value << ' ';
 				}
-			})
-		{
-		}
-	private:
-		thread_t thread;
-	};
+				std::cout << '\n';
+				buffer.clear();
+			}
+		})
+	{
+	}
+private:
+	thread_t thread;
+};
+```
 
 This will ensure that we only allocate memory at the high-memory points of our application. This can lead to significant gains in performance.
 
@@ -129,16 +139,18 @@ You can also call `reserve` on the queue before you begin adding elements to it,
 
 You might even see this as your output:
 
-	0 
-	1 
-	2 
-	3 
-	4 
-	5 
-	6 
-	7 
-	8 
-	9 
+```
+0 
+1 
+2 
+3 
+4 
+5 
+6 
+7 
+8 
+9 
+```
 
 This is because of the way that `boost::thread` interruption points work with `condition_variable`s. There is currently a [discussion on the mailing list about this](http://boost.2283326.n4.nabble.com/thread-Interaction-between-interruption-points-and-condition-variable-td4695594.html), so this documentation will have to be filled in later based on the outcome of that. As of now, if you need to guarantee that you read all elements that have been added into the queue at shutdown, you need to catch the `boost::thread_interrupted` exception and call `try_pop_all` one final time before shutting down.
 
