@@ -37,7 +37,7 @@ target_link_libraries(concurrent_queue INTERFACE
 target_include_directories(concurrent_queue INTERFACE
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	$<INSTALL_INTERFACE:include>
-)	
+)
 
 if(NOT WINDOWS)
 	target_link_libraries(concurrent_queue INTERFACE
