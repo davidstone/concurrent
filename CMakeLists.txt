@@ -16,9 +16,12 @@ if (NOT has_parent)
 	set(CMAKE_CXX_EXTENSIONS Off)
 
 	add_subdirectory(dependencies/cmake_strict_defaults)
-	find_package(Boost COMPONENTS chrono program_options system thread REQUIRED)
+	find_package(Boost COMPONENTS program_options thread REQUIRED)
 	add_library(boost INTERFACE IMPORTED)
-	target_compile_definitions(boost INTERFACE BOOST_ALL_NO_LIB)
+	target_compile_definitions(boost INTERFACE
+		BOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING
+		BOOST_CHRONO_HEADER_ONLY
+	)
 	set_property(TARGET boost PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIR})
 endif()
 
@@ -26,9 +29,7 @@ add_library(concurrent_queue INTERFACE)
 
 target_link_libraries(concurrent_queue INTERFACE
 	boost
-	boost_chrono
 	boost_program_options
-	boost_system
 	boost_thread
 	strict_defaults_interface
 )
