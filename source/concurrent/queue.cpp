@@ -5,6 +5,11 @@
 
 #include <concurrent/queue.hpp>
 
+#include <bounded/scope_guard.hpp>
+
+#include <containers/stable_vector.hpp>
+#include <containers/vector.hpp>
+
 #include <boost/thread/scoped_thread.hpp>
 
 #include <algorithm>
@@ -52,7 +57,7 @@ void test_string() {
 	char const * array[] = {
 		"Carter", "Fusco"
 	};
-	queue.append(std::begin(array), std::end(array));
+	queue.append(array);
 	auto const values = queue.pop_all();
 	auto const expected = std::array<char const *, 4>{
 		"Reese", "Finch", "Carter", "Fusco"
@@ -125,6 +130,25 @@ void test_copy_move() {
 
 	check_all();
 
+	{
+		auto v = std::vector<copy_move_counter>();
+		auto a = std::array<copy_move_counter, 3>();
+		expected_default_constructed += size(a);
+		containers::detail::assign_to_empty_or_append(
+			v,
+			std::move(a),
+			containers::detail::exponential_reserve,
+			[&] { return containers::end(v); },
+			containers::detail::append_fallback
+		);
+		expected_move_constructed += size(a);
+		CONCURRENT_TEST(copy_move_counter::default_constructed() == 3);
+		CONCURRENT_TEST(copy_move_counter::copy_constructed() == 0);
+		CONCURRENT_TEST(copy_move_counter::move_constructed() == 3);
+		CONCURRENT_TEST(copy_move_counter::copy_assigned() == 0);
+		CONCURRENT_TEST(copy_move_counter::move_assigned() == 0);
+	}
+	
 	queue.emplace();
 	++expected_default_constructed;
 	check_all();
@@ -135,15 +159,15 @@ void test_copy_move() {
 	auto array = std::array<copy_move_counter, 3>{};
 	expected_default_constructed += size(array);
 	check_all();
-	
-	queue.append(array.begin(), array.end());
+
+	queue.append(array);
 	expected_copy_constructed += size(array);
 	check_all();
 	
 	queue.pop_all();
 	check_all();
-	
-	queue.append(std::make_move_iterator(array.begin()), std::make_move_iterator(array.end()));
+
+	queue.append(std::move(array));
 	expected_move_constructed += size(array);
 	check_all();
 }
@@ -196,43 +220,33 @@ void test_blocking() {
 	CONCURRENT_TEST(result.front() == value);
 }
 
-template<typename Function>
-struct scope_guard {
-	constexpr explicit scope_guard(Function function_) noexcept(std::is_nothrow_move_constructible<Function>{}):
-		function(std::move(function_)),
-		is_active(true)
-	{
-	}
-	
-	constexpr scope_guard(scope_guard && other) noexcept(std::is_nothrow_move_constructible<Function>{}):
-		function(std::move(other.function)),
-		is_active(std::exchange(other.is_active, false))
-	{
-	}
+constexpr auto reserved_size = 6'000'000'000;
+template<typename T>
+using Container = containers::stable_vector<T, reserved_size>;
 
-	~scope_guard() {
-		if (is_active) {
-			std::move(function)();
+template<typename C>
+void reserve([[maybe_unused]] C & c) {
+#if 0
+	c.reserve(bounded::assume_in_range<containers::range_size_t<C>>(reserved_size));
+#endif
+}
+
+struct spin_mutex {
+	auto try_lock() -> bool {
+		return !m_flag.test_and_set(std::memory_order_acquire);
+	}
+	auto lock() -> void {
+		while (!try_lock()) {
+			while (m_flag.test(std::memory_order_relaxed)) {
+			}
 		}
 	}
-	
-	constexpr void dismiss() noexcept {
-		is_active = false;
+	auto unlock() -> void {
+		m_flag.clear(std::memory_order_release);
 	}
-
 private:
-	Function function;
-	bool is_active;
+	std::atomic_flag m_flag = ATOMIC_FLAG_INIT;
 };
-
-constexpr auto reserved_size = 3'000'000'000;
-template<typename T>
-using Container = std::vector<T>;
-
-template<typename T>
-void reserve(Container<T> & v) {
-	v.reserve(static_cast<typename Container<T>::size_type>(reserved_size));
-}
 
 void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers, std::size_t bulk_size) {
 	std::atomic<std::uint64_t> largest_read(0);
@@ -259,8 +273,9 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 	
 	auto update_atomic = [](auto & atomic, auto & local) { return bounded::scope_guard([&]{ atomic += local; }); };
 	
-	auto queue = concurrent::basic_unbounded_queue<Container<value_type>>{};
-	queue.reserve(static_cast<Container<value_type>::size_type>(reserved_size));
+	using namespace bounded::literal;
+	auto queue = concurrent::basic_unbounded_queue<Container<value_type>, spin_mutex>();
+	reserve(queue);
 		
 	auto const start = now();
 
@@ -272,7 +287,7 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 			reserve(data);
 
 			auto local_largest_read = std::uint64_t(0);
-			auto const update_largest_read = scope_guard([&]{
+			auto const update_largest_read = bounded::scope_guard([&]{
 				auto temp = largest_read.load();
 				while (temp < local_largest_read and !largest_read.compare_exchange_weak(temp, local_largest_read)) {
 				}
@@ -294,19 +309,16 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 				auto const count = size(data);
 				local_largest_read = std::max(local_largest_read, static_cast<std::size_t>(count));
 				local_items_read += count;
-				for (auto it = begin(data); it != end(data);) {
-					for (auto p = bulk_data_begin; p != bulk_data_end; ++p) {
-						CONCURRENT_TEST(it != end(data));
-						CONCURRENT_TEST(*it == *p);
-							++it;
-					}
+				CONCURRENT_TEST(count % bulk_size == 0_bi);
+				for (auto it = begin(data); it != end(data); it += bounded::assume_in_range(bulk_size, 0_bi, bounded::constant<reserved_size>)) {
+					CONCURRENT_TEST(containers::equal(bulk_data_begin, bulk_data_end, it));
 				}
 			};
 			try {
 				while (true) {
 					data = queue.pop_all(std::move(data));
 					process_data();
-					data.clear();
+					containers::clear(data);
 				}
 			} catch (boost::thread_interrupted const &) {
 				data = queue.try_pop_all(std::move(data));
@@ -318,8 +330,9 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 			auto local_number_of_writes = std::uint64_t(0);
 			auto const update_count_of_writes = update_atomic(number_of_writes, local_number_of_writes);
 			while (!boost::this_thread::interruption_requested()) {
-				queue.append(bulk_data_begin, bulk_data_end);
+				queue.append(bulk_data_source);
 				++local_number_of_writes;
+				boost::this_thread::yield();
 			}
 		});
 	

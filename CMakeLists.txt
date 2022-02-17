@@ -16,6 +16,7 @@ if (NOT has_parent)
 	set(CMAKE_CXX_EXTENSIONS Off)
 
 	add_subdirectory(dependencies/cmake_strict_defaults)
+	add_subdirectory(dependencies/bounded)
 	find_package(Boost COMPONENTS program_options thread REQUIRED)
 	add_library(boost INTERFACE IMPORTED)
 	target_compile_definitions(boost INTERFACE
@@ -31,6 +32,8 @@ target_link_libraries(concurrent_queue INTERFACE
 	boost
 	boost_thread
 	strict_defaults_interface
+	bounded
+	containers
 )
 
 target_include_directories(concurrent_queue INTERFACE

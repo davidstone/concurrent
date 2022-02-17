@@ -14,6 +14,14 @@
 #include <boost/thread/lock_guard.hpp>
 #include <boost/thread/lock_types.hpp>
 
+#include <containers/append.hpp>
+#include <containers/clear.hpp>
+#include <containers/emplace_back.hpp>
+#include <containers/front_back.hpp>
+#include <containers/is_empty.hpp>
+#include <containers/pop_front.hpp>
+#include <containers/size.hpp>
+
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -22,21 +30,8 @@
 namespace concurrent {
 namespace detail {
 
-template<typename Container, typename = void>
-constexpr bool supports_pop_front = false;
-
 template<typename Container>
-constexpr bool supports_pop_front<Container, std::void_t<decltype(std::declval<Container &>().pop_front())>> = true;
-
-inline constexpr auto size = [](auto && range) {
-	using std::size;
-	return size(range);
-};
-
-inline constexpr auto empty = [](auto && range) {
-	using std::empty;
-	return empty(range);
-};
+concept pop_frontable = requires(Container & container) { containers::pop_front(container); };
 
 template<typename Mutex>
 using condition_variable = std::conditional_t<std::is_same_v<Mutex, boost::mutex>, boost::condition_variable, boost::condition_variable_any>;
@@ -44,7 +39,7 @@ using condition_variable = std::conditional_t<std::is_same_v<Mutex, boost::mutex
 template<typename Container, typename Mutex, typename Derived>
 struct basic_queue_impl {
 	using container_type = Container;
-	using value_type = typename Container::value_type;
+	using value_type = containers::range_value_t<Container>;
 
 	basic_queue_impl() = default;
 
@@ -53,22 +48,20 @@ struct basic_queue_impl {
 	// lock for the entire insert, rather than acquiring a lock per element.
 	// This will also optimize memory usage, as the underlying container can
 	// reserve all the space it needs.
-	template<typename InputIterator, typename Sentinel>
-	auto append(InputIterator const first, Sentinel const last) -> void {
+	auto append(containers::range auto && input) -> void {
 		constexpr auto adding_several = std::true_type{};
-		generic_add(adding_several, [&]{ m_container.insert(m_container.end(), first, last); });
+		generic_add(adding_several, [&]{ containers::append(m_container, OPERATORS_FORWARD(input)); });
 	}
 
-	template<typename InputIterator, typename Sentinel>
-	bool non_blocking_append(InputIterator const first, Sentinel const last) {
+	bool non_blocking_append(containers::range auto && input) {
 		constexpr auto adding_several = std::true_type{};
-		return generic_non_blocking_add(adding_several, [&]{ m_container.insert(m_container.end(), first, last); });
+		return generic_non_blocking_add(adding_several, [&]{ containers::append(m_container, OPERATORS_FORWARD(input)); });
 	}
 
 	template<typename... Args>
 	auto emplace(Args && ... args) -> void {
 		constexpr auto adding_several = std::false_type{};
-		generic_add(adding_several, [&]{ m_container.emplace_back(std::forward<Args>(args)...); });
+		generic_add(adding_several, [&]{ containers::emplace_back(m_container, std::forward<Args>(args)...); });
 	}
 	auto push(value_type && value) -> void {
 		emplace(std::move(value));
@@ -80,7 +73,7 @@ struct basic_queue_impl {
 	template<typename... Args>
 	bool non_blocking_emplace(Args && ... args) {
 		constexpr auto adding_several = std::false_type{};
-		return generic_non_blocking_add(adding_several, [&]{ m_container.emplace_back(std::forward<Args>(args)...); });
+		return generic_non_blocking_add(adding_several, [&]{ containers::emplace_back(m_container, std::forward<Args>(args)...); });
 	}
 	bool non_blocking_push(value_type && value) {
 		return non_blocking_emplace(std::move(value));
@@ -139,7 +132,7 @@ struct basic_queue_impl {
 	template<typename Clock, typename Duration>
 	std::optional<value_type> pop_one(boost::chrono::time_point<Clock, Duration> const timeout) {
 		auto lock = wait_for_data(timeout);
-		if (empty(m_container)) {
+		if (containers::is_empty(m_container)) {
 			return std::nullopt;
 		}
 		return generic_pop_one(std::move(lock));
@@ -147,7 +140,7 @@ struct basic_queue_impl {
 	template<typename Rep, typename Period>
 	std::optional<value_type> pop_one(boost::chrono::duration<Rep, Period> const timeout) {
 		auto lock = wait_for_data(timeout);
-		if (empty(m_container)) {
+		if (containers::is_empty(m_container)) {
 			return std::nullopt;
 		}
 		return generic_pop_one(std::move(lock));
@@ -155,7 +148,7 @@ struct basic_queue_impl {
 
 	std::optional<value_type> try_pop_one() {
 		auto lock = lock_type(m_mutex);
-		if (empty(m_container)) {
+		if (containers::is_empty(m_container)) {
 			return std::nullopt;
 		}
 		return generic_pop_one(std::move(lock));
@@ -164,8 +157,8 @@ struct basic_queue_impl {
 
 	void clear() {
 		auto const lock = lock_type(m_mutex);
-		auto const previous_size = detail::size(m_container);
-		m_container.clear();
+		auto const previous_size = containers::size(m_container);
+		containers::clear(m_container);
 		derived().handle_remove_all(previous_size);
 	}
 
@@ -177,14 +170,14 @@ struct basic_queue_impl {
 	}
 	auto size() const {
 		auto lock = lock_type(m_mutex);
-		return detail::size(m_container);
+		return containers::size(m_container);
 	}
 
 private:
 	using lock_type = boost::unique_lock<Mutex>;
 
 	auto is_not_empty() const {
-		return [&]{ return !empty(m_container); };
+		return [&]{ return !containers::is_empty(m_container); };
 	}
 
 	auto wait_for_data() {
@@ -229,7 +222,7 @@ private:
 	template<typename Bool, typename Function>
 	auto generic_add_impl(Bool const adding_several, lock_type lock, Function && add) -> void {
 		derived().handle_add(m_container, lock);
-		auto const was_empty = empty(m_container);
+		auto const was_empty = containers::is_empty(m_container);
 		add();
 		lock.unlock();
 		// It is safe to notify outside of the lock here.
@@ -266,7 +259,7 @@ private:
 		// A, B, 1, 2: Same as A, 1, 2, B. 2 never waits because 1 does not
 		// find an empty container.
 		if (was_empty) {
-			if constexpr (detail::supports_pop_front<Container> && adding_several) {
+			if constexpr (detail::pop_frontable<Container> && adding_several) {
 				m_notify_addition.notify_all();
 			} else {
 				m_notify_addition.notify_one();
@@ -279,16 +272,16 @@ private:
 	container_type generic_pop_all(lock_type lock, container_type storage) {
 		using std::swap;
 		swap(m_container, storage);
-		derived().handle_remove_all(detail::size(storage));
+		derived().handle_remove_all(containers::size(storage));
 		lock.unlock();
 		return storage;
 	}
 
 	// lock must be in the locked state
 	value_type generic_pop_one(lock_type lock) {
-		auto const previous_size = detail::size(m_container);
-		auto result = std::move(m_container.front());
-		m_container.pop_front();
+		auto const previous_size = containers::size(m_container);
+		auto result = std::move(containers::front(m_container));
+		containers::pop_front(m_container);
 		derived().handle_remove_one(previous_size);
 		lock.unlock();
 		return result;
@@ -334,9 +327,9 @@ private:
 
 	void handle_add(Container &, boost::unique_lock<Mutex> &) {
 	}
-	void handle_remove_all(typename Container::size_type) {
+	void handle_remove_all(containers::range_size_t<Container>) {
 	}
-	void handle_remove_one(typename Container::size_type) {
+	void handle_remove_one(containers::range_size_t<Container>) {
 	}
 };
 
@@ -356,7 +349,7 @@ public:
 	using typename base::container_type;
 	using typename base::value_type;
 
-	explicit basic_blocking_queue(typename Container::size_type const max_size_):
+	explicit basic_blocking_queue(containers::range_size_t<Container> const max_size_):
 		m_max_size(max_size_)
 	{
 	}
@@ -386,20 +379,20 @@ private:
 	friend base;
 
 	void handle_add(Container & queue, boost::unique_lock<Mutex> & lock) {
-		m_notify_removal.wait(lock, [&]{ return detail::size(queue) < m_max_size; });
+		m_notify_removal.wait(lock, [&]{ return containers::size(queue) < m_max_size; });
 	}
-	void handle_remove_all(typename Container::size_type const previous_size) {
+	void handle_remove_all(containers::range_size_t<Container> const previous_size) {
 		if (previous_size >= max_size()) {
 			m_notify_removal.notify_all();
 		}
 	}
-	void handle_remove_one(typename Container::size_type const previous_size) {
+	void handle_remove_one(containers::range_size_t<Container> const previous_size) {
 		if (previous_size >= max_size()) {
 			m_notify_removal.notify_one();
 		}
 	}
 
-	typename Container::size_type m_max_size;
+	containers::range_size_t<Container> m_max_size;
 	detail::condition_variable<Mutex> m_notify_removal;
 };
 
