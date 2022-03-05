@@ -261,6 +261,8 @@ private:
 		// after A. B sends a signal that no one receives, but that is OK
 		// because no one needs to receive it.
 		//
+		// A, 1, B, 2: Same explanation as A, 1, 2, B.
+		//
 		// A, B, 1, 2: Same as A, 1, 2, B. 2 never waits because 1 does not
 		// find an empty container.
 		if (was_empty) {
