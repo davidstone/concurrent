@@ -29,7 +29,6 @@ add_library(concurrent_queue INTERFACE)
 
 target_link_libraries(concurrent_queue INTERFACE
 	boost
-	boost_program_options
 	boost_thread
 	strict_defaults_interface
 )

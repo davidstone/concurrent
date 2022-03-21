@@ -5,7 +5,6 @@
 
 #include <concurrent/queue.hpp>
 
-#include <boost/program_options.hpp>
 #include <boost/thread/scoped_thread.hpp>
 
 #include <algorithm>
@@ -336,40 +335,35 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 	std::cout << largest_read.load() << " peak elements on queue\n";
 }
 
-}	// namespace
+struct parsed_args {
+	std::size_t readers;
+	std::size_t writers;
+	std::size_t batch_size;
+};
 
-int main(int argc, char ** argv) {
-	namespace po = boost::program_options;
-	po::options_description description("Allowed options");
-	description.add_options()
-		("help", "produce help message")
-		("readers", po::value<std::size_t>()->default_value(1), "Number of threads reading data (minimum of 1)")
-		("writers", po::value<std::size_t>()->default_value(1), "Number of threads writing data (minimum of 1)")
-		("batch-size", po::value<std::size_t>()->default_value(2000), "Number of elements the writers are adding at a time")
-	;
-	
-	po::variables_map options;
-	po::store(po::parse_command_line(argc, argv, description), options);
-	po::notify(options);
+auto parse_args(int const argc, char const * const * argv) {
+	if (argc == 1) {
+		return parsed_args{1, 1, 2000};
+	}
+	if (argc != 4) {
+		throw std::runtime_error("Usage is queue readers writers batch-size");
+	}
+	auto const readers = std::stoull(argv[1]);
+	auto const writers = std::stoull(argv[2]);
+	auto const batch_size = std::stoull(argv[3]);
+	if (readers == 0) {
+		throw std::runtime_error("Must have at least one reader thread");
+	}
+	if (writers == 0) {
+		throw std::runtime_error("Must have at least one writer thread");
+	}
+	return parsed_args{readers, writers, batch_size};
+}
 
-	if (options.count("help")) {
-		std::cout << description << '\n';
-		return 0;
-	}
-	
-	auto const number_of_readers = options["readers"].as<std::size_t>();
-	auto const number_of_writers = options["writers"].as<std::size_t>();
-	auto const batch_size = options["batch-size"].as<std::size_t>();
-	
-	if (number_of_readers == 0) {
-		std::cerr << "Must have at least one reader thread\n";
-		return 1;
-	}
-	if (number_of_writers == 0) {
-		std::cerr << "Must have at least one writer thread\n";
-		return 1;
-	}
-	
+} // namespace
+
+int main(int const argc, char const * const * argv) {
+	auto const args = parse_args(argc, argv);
 	test_int();
 	test_string();
 
@@ -379,5 +373,5 @@ int main(int argc, char ** argv) {
 	test_timeout();
 	test_blocking();
 	
-	test_ordering(number_of_readers, number_of_writers, batch_size);
+	test_ordering(args.readers, args.writers, args.batch_size);
 }
