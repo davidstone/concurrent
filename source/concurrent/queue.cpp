@@ -248,18 +248,18 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 		}();
 	value_type const * const bulk_data_begin = bulk_data_source.data();
 	value_type const * const bulk_data_end = bulk_data_source.data() + size(bulk_data_source);
-		
-		auto create_threads = [](auto const count, auto const function) {
-			auto threads = std::vector<thread_t>{};
-			threads.reserve(count);
-			for (std::size_t n = 0; n != count; ++n) {
-				threads.emplace_back(function);
-			}
-			return threads;
-		};
-		
-	auto update_atomic = [](auto & atomic, auto & local) { return scope_guard([&]{ atomic += local; }); };
-		
+	
+	auto create_threads = [](auto const count, auto const function) {
+		auto threads = std::vector<thread_t>{};
+		threads.reserve(count);
+		for (std::size_t n = 0; n != count; ++n) {
+			threads.emplace_back(function);
+		}
+		return threads;
+	};
+	
+	auto update_atomic = [](auto & atomic, auto & local) { return bounded::scope_guard([&]{ atomic += local; }); };
+	
 	auto queue = concurrent::basic_unbounded_queue<Container<value_type>>{};
 	queue.reserve(static_cast<Container<value_type>::size_type>(reserved_size));
 		
