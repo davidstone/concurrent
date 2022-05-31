@@ -128,25 +128,6 @@ void test_copy_move() {
 
 	check_all();
 
-	{
-		auto v = std::vector<copy_move_counter>();
-		auto a = std::array<copy_move_counter, 3>();
-		expected_default_constructed += size(a);
-		containers::detail::assign_to_empty_or_append(
-			v,
-			std::move(a),
-			containers::detail::exponential_reserve,
-			[&] { return containers::end(v); },
-			containers::detail::append_fallback
-		);
-		expected_move_constructed += size(a);
-		CONCURRENT_TEST(copy_move_counter::default_constructed() == 3);
-		CONCURRENT_TEST(copy_move_counter::copy_constructed() == 0);
-		CONCURRENT_TEST(copy_move_counter::move_constructed() == 3);
-		CONCURRENT_TEST(copy_move_counter::copy_assigned() == 0);
-		CONCURRENT_TEST(copy_move_counter::move_assigned() == 0);
-	}
-	
 	queue.emplace();
 	++expected_default_constructed;
 	check_all();
