@@ -9,11 +9,6 @@
 
 #pragma once
 
-#include <boost/thread/condition_variable.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/lock_guard.hpp>
-#include <boost/thread/lock_types.hpp>
-
 #include <containers/append.hpp>
 #include <containers/clear.hpp>
 #include <containers/emplace_back.hpp>
@@ -22,19 +17,19 @@
 #include <containers/pop_front.hpp>
 #include <containers/size.hpp>
 
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <optional>
+#include <thread>
 #include <type_traits>
 #include <utility>
-#include <vector>
 
 namespace concurrent {
 namespace detail {
 
 template<typename Container>
 concept pop_frontable = requires(Container & container) { containers::pop_front(container); };
-
-template<typename Mutex>
-using condition_variable = std::conditional_t<std::is_same_v<Mutex, boost::mutex>, boost::condition_variable, boost::condition_variable_any>;
 
 template<typename Container, typename Mutex, typename Derived>
 struct basic_queue_impl {
@@ -95,23 +90,36 @@ struct basic_queue_impl {
 	// All pop_all overloads accept a parameter of the same type as the
 	// container. This argument is used to reuse capacity. This is especially
 	// helpful for the common case where the container is a std::vector.
-	//
+
 	// This overload never returns an empty container. If the queue is empty,
 	// this will block
 	Container pop_all(Container storage = Container{}) {
 		return generic_pop_all(wait_for_data(), std::move(storage));
 	}
+	// This overload can return an empty container if a stop was requested. If
+	// the queue is empty, this will block.
+	Container pop_all(std::stop_token token, Container storage = Container{}) {
+		return generic_pop_all(wait_for_data(std::move(token)), std::move(storage));
+	}
 
-	// The two versions with a timeout will block until there is data available,
+	// The versions with a timeout will block until there is data available,
 	// unless the timeout is reached, in which case they return an empty
 	// container.
 	template<typename Clock, typename Duration>
-	Container pop_all(boost::chrono::time_point<Clock, Duration> const timeout, Container storage = Container{}) {
+	Container pop_all(std::chrono::time_point<Clock, Duration> const timeout, Container storage = Container{}) {
+		return generic_pop_all(wait_for_data(timeout), std::move(storage));
+	}
+	template<typename Clock, typename Duration>
+	Container pop_all(std::stop_token token, std::chrono::time_point<Clock, Duration> const timeout, Container storage = Container{}) {
+		return generic_pop_all(wait_for_data(std::move(token), timeout), std::move(storage));
+	}
+	template<typename Rep, typename Period>
+	Container pop_all(std::chrono::duration<Rep, Period> const timeout, Container storage = Container{}) {
 		return generic_pop_all(wait_for_data(timeout), std::move(storage));
 	}
 	template<typename Rep, typename Period>
-	Container pop_all(boost::chrono::duration<Rep, Period> const timeout, Container storage = Container{}) {
-		return generic_pop_all(wait_for_data(timeout), std::move(storage));
+	Container pop_all(std::stop_token token, std::chrono::duration<Rep, Period> const timeout, Container storage = Container{}) {
+		return generic_pop_all(wait_for_data(std::move(token), timeout), std::move(storage));
 	}
 
 	// Does not wait for data (can return an empty container)
@@ -125,12 +133,35 @@ struct basic_queue_impl {
 	value_type pop_one() {
 		return generic_pop_one(wait_for_data());
 	}
+	std::optional<value_type> pop_one(std::stop_token token) {
+		auto lock = wait_for_data(std::move(token));
+		if (containers::is_empty(m_container)) {
+			return std::nullopt;
+		}
+		return generic_pop_one(std::move(lock));
+	}
 
-	// The two versions with a timeout will return as soon as there is data
+	// The versions with a timeout will return as soon as there is data
 	// available, unless the timeout is reached, in which case they return
-	// boost::none
+	// std::nullopt
 	template<typename Clock, typename Duration>
-	std::optional<value_type> pop_one(boost::chrono::time_point<Clock, Duration> const timeout) {
+	std::optional<value_type> pop_one(std::chrono::time_point<Clock, Duration> const timeout) {
+		auto lock = wait_for_data(timeout);
+		if (containers::is_empty(m_container)) {
+			return std::nullopt;
+		}
+		return generic_pop_one(std::move(lock));
+	}
+	template<typename Clock, typename Duration>
+	std::optional<value_type> pop_one(std::stop_token token, std::chrono::time_point<Clock, Duration> const timeout) {
+		auto lock = wait_for_data(std::move(token), timeout);
+		if (containers::is_empty(m_container)) {
+			return std::nullopt;
+		}
+		return generic_pop_one(std::move(lock));
+	}
+	template<typename Rep, typename Period>
+	std::optional<value_type> pop_one(std::chrono::duration<Rep, Period> const timeout) {
 		auto lock = wait_for_data(timeout);
 		if (containers::is_empty(m_container)) {
 			return std::nullopt;
@@ -138,8 +169,8 @@ struct basic_queue_impl {
 		return generic_pop_one(std::move(lock));
 	}
 	template<typename Rep, typename Period>
-	std::optional<value_type> pop_one(boost::chrono::duration<Rep, Period> const timeout) {
-		auto lock = wait_for_data(timeout);
+	std::optional<value_type> pop_one(std::stop_token token, std::chrono::duration<Rep, Period> const timeout) {
+		auto lock = wait_for_data(std::move(token), timeout);
 		if (containers::is_empty(m_container)) {
 			return std::nullopt;
 		}
@@ -174,27 +205,44 @@ struct basic_queue_impl {
 	}
 
 private:
-	using lock_type = boost::unique_lock<Mutex>;
+	using lock_type = std::unique_lock<Mutex>;
 
 	auto is_not_empty() const {
 		return [&]{ return !containers::is_empty(m_container); };
 	}
 
+	auto wait_for_data(std::stop_token token) {
+		auto lock = lock_type(m_mutex);
+		m_notify_addition.wait(lock, std::move(token), is_not_empty());
+		return lock;
+	}
 	auto wait_for_data() {
 		auto lock = lock_type(m_mutex);
 		m_notify_addition.wait(lock, is_not_empty());
 		return lock;
 	}
 	template<typename Clock, typename Duration>
-	auto wait_for_data(boost::chrono::time_point<Clock, Duration> const timeout) {
+	auto wait_for_data(std::chrono::time_point<Clock, Duration> const timeout) {
 		auto lock = lock_type(m_mutex);
 		m_notify_addition.wait_until(lock, timeout, is_not_empty());
 		return lock;
 	}
+	template<typename Clock, typename Duration>
+	auto wait_for_data(std::stop_token token, std::chrono::time_point<Clock, Duration> const timeout) {
+		auto lock = lock_type(m_mutex);
+		m_notify_addition.wait_until(lock, std::move(token), timeout, is_not_empty());
+		return lock;
+	}
 	template<typename Rep, typename Period>
-	auto wait_for_data(boost::chrono::duration<Rep, Period> const timeout) {
+	auto wait_for_data(std::chrono::duration<Rep, Period> const timeout) {
 		auto lock = lock_type(m_mutex);
 		m_notify_addition.wait_for(lock, timeout, is_not_empty());
+		return lock;
+	}
+	template<typename Rep, typename Period>
+	auto wait_for_data(std::stop_token token, std::chrono::duration<Rep, Period> const timeout) {
+		auto lock = lock_type(m_mutex);
+		m_notify_addition.wait_for(lock, std::move(token), timeout, is_not_empty());
 		return lock;
 	}
 
@@ -211,7 +259,7 @@ private:
 
 	template<typename Bool, typename Function>
 	bool generic_non_blocking_add(Bool const adding_several, Function && add) {
-		auto lock = lock_type(m_mutex, boost::try_to_lock);
+		auto lock = lock_type(m_mutex, std::try_to_lock);
 		if (!lock.owns_lock()) {
 			return false;
 		}
@@ -289,13 +337,13 @@ private:
 
 	container_type m_container;
 	mutable Mutex m_mutex;
-	detail::condition_variable<Mutex> m_notify_addition;
+	std::condition_variable_any m_notify_addition;
 };
 
 }	// namespace detail
 
 // basic_unbounded_queue is limited only by the available memory on the system
-template<typename Container, typename Mutex = boost::mutex>
+template<typename Container, typename Mutex = std::mutex>
 struct basic_unbounded_queue : private detail::basic_queue_impl<Container, Mutex, basic_unbounded_queue<Container, Mutex>> {
 private:
 	using base = detail::basic_queue_impl<Container, Mutex, basic_unbounded_queue<Container, Mutex>>;
@@ -325,7 +373,7 @@ public:
 private:
 	friend base;
 
-	void handle_add(Container &, boost::unique_lock<Mutex> &) {
+	void handle_add(Container &, std::unique_lock<Mutex> &) {
 	}
 	void handle_remove_all(containers::range_size_t<Container>) {
 	}
@@ -333,15 +381,15 @@ private:
 	}
 };
 
-template<typename T, typename Mutex = boost::mutex>
-using unbounded_queue = basic_unbounded_queue<std::vector<T>, boost::mutex>;
+template<typename T, typename Mutex = std::mutex>
+using unbounded_queue = basic_unbounded_queue<std::vector<T>, std::mutex>;
 
 
 
 // blocking_queue has a max_size. If the queue contains at least max_size()
 // elements when attempting to add data, the call will block until the size is
 // less than max_size().
-template<typename Container, typename Mutex = boost::mutex>
+template<typename Container, typename Mutex = std::mutex>
 struct basic_blocking_queue : private detail::basic_queue_impl<Container, Mutex, basic_blocking_queue<Container, Mutex>> {
 private:
 	using base = detail::basic_queue_impl<Container, Mutex, basic_blocking_queue<Container, Mutex>>;
@@ -378,8 +426,11 @@ public:
 private:
 	friend base;
 
-	void handle_add(Container & queue, boost::unique_lock<Mutex> & lock) {
+	void handle_add(Container & queue, std::unique_lock<Mutex> & lock) {
 		m_notify_removal.wait(lock, [&]{ return containers::size(queue) < m_max_size; });
+	}
+	void handle_add(Container & queue, std::stop_token token, std::unique_lock<Mutex> & lock) {
+		m_notify_removal.wait(lock, std::move(token), [&]{ return containers::size(queue) < m_max_size; });
 	}
 	void handle_remove_all(containers::range_size_t<Container> const previous_size) {
 		if (previous_size >= max_size()) {
@@ -393,10 +444,10 @@ private:
 	}
 
 	containers::range_size_t<Container> m_max_size;
-	detail::condition_variable<Mutex> m_notify_removal;
+	std::condition_variable_any m_notify_removal;
 };
 
-template<typename T, typename Mutex = boost::mutex>
+template<typename T, typename Mutex = std::mutex>
 using blocking_queue = basic_blocking_queue<std::vector<T>, Mutex>;
 
 } // namespace concurrent

@@ -18,9 +18,7 @@ This is a sample program that has two producer threads that are generating the n
 
 ```
 #include <concurrent/queue.hpp>
-#include <thread/scoped_thread.hpp>
-
-using thread_t = boost::scoped_thread<boost::interrupt_and_join_if_joinable>;
+#include <thread>
 
 struct producer_t {
 	explicit producer_t(concurrent::unbounded_queue<int> & queue):
@@ -32,13 +30,13 @@ struct producer_t {
 	{
 	}
 private:
-	thread_t thread;
+	std::jthread thread;
 };
 
 struct consumer_t {
 	explicit consumer_t(concurrent::unbounded_queue<int> & queue):
-		thread([&]{
-			while (true) {
+		thread([&](std::stop_token token) {
+			while (!token.stop_requested()) {
 				for (int const value : queue.pop_all()) {
 					std::cout << value << ' ';
 				}
@@ -48,7 +46,7 @@ struct consumer_t {
 	{
 	}
 private:
-	thread_t thread;
+	std::jthread thread;
 };
 
 int main() {
@@ -113,9 +111,9 @@ The call to `push` has the same rules around when memory is allocated as `std::v
 ```
 struct consumer_t {
 	explicit consumer_t(concurrent::unbounded_queue<int> & queue):
-		thread([&]{
+		thread([&](std::stop_token token) {
 			auto buffer = concurrent::unbounded_queue<int>::container_type();
-			while (true) {
+			while (!token.stop_requested()) {
 				buffer = queue.pop_all(std::move(buffer));
 				for (int const value : buffer) {
 					std::cout << value << ' ';
@@ -127,7 +125,7 @@ struct consumer_t {
 	{
 	}
 private:
-	thread_t thread;
+	std::jthread thread;
 };
 ```
 
@@ -152,7 +150,7 @@ You might even see this as your output:
 9 
 ```
 
-This is because of the way that `boost::thread` interruption points work with `condition_variable`s. There is currently a [discussion on the mailing list about this](http://boost.2283326.n4.nabble.com/thread-Interaction-between-interruption-points-and-condition-variable-td4695594.html), so this documentation will have to be filled in later based on the outcome of that. As of now, if you need to guarantee that you read all elements that have been added into the queue at shutdown, you need to catch the `boost::thread_interrupted` exception and call `try_pop_all` one final time before shutting down.
+This is because of the time between requesting a stop and checking whether a stop was requested. If you need to guarantee that you read all elements that have been added into the queue at shutdown, you need to call `try_pop_all` one final time before shutting down.
 
 # [Reference](reference.md)
 

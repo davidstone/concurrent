@@ -10,8 +10,6 @@
 #include <containers/stable_vector.hpp>
 #include <containers/vector.hpp>
 
-#include <boost/thread/scoped_thread.hpp>
-
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -175,9 +173,9 @@ void test_copy_move() {
 #endif
 
 auto now() {
-	return boost::chrono::steady_clock::now();
+	return std::chrono::steady_clock::now();
 }
-auto const duration = boost::chrono::milliseconds(100);
+auto const duration = std::chrono::milliseconds(100);
 
 void test_timeout() {
 	auto queue = concurrent::unbounded_queue<int>{};
@@ -194,7 +192,7 @@ void test_timeout() {
 	CONCURRENT_TEST(empty(values_duration));
 	
 	queue.push(0);
-	auto const should_be_fast = queue.pop_all(boost::chrono::hours(24 * 365));
+	auto const should_be_fast = queue.pop_all(std::chrono::hours(24 * 365));
 	CONCURRENT_TEST(size(should_be_fast) == 1);
 	CONCURRENT_TEST(should_be_fast[0] == 0);
 	
@@ -204,14 +202,12 @@ void test_timeout() {
 
 
 
-using thread_t = boost::scoped_thread<boost::interrupt_and_join_if_joinable>;
-
 void test_blocking() {
 	auto queue = concurrent::unbounded_queue<int>{};
 	auto const value = 6;
 	auto const time_to_wake_up = now() + duration;
-	auto thread = thread_t([&]{
-		boost::this_thread::sleep_until(time_to_wake_up);
+	auto thread = std::jthread([&]{
+		std::this_thread::sleep_until(time_to_wake_up);
 		queue.emplace(value);
 	});
 	auto const result = queue.pop_all();
@@ -263,7 +259,7 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 	value_type const * const bulk_data_end = bulk_data_source.data() + size(bulk_data_source);
 	
 	auto create_threads = [](auto const count, auto const function) {
-		auto threads = std::vector<thread_t>{};
+		auto threads = std::vector<std::jthread>{};
 		threads.reserve(count);
 		for (std::size_t n = 0; n != count; ++n) {
 			threads.emplace_back(function);
@@ -282,7 +278,7 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 	{
 		// The reader thread should only see units of bulk_data, never a partial
 		// update.
-		auto const reader_threads = create_threads(number_of_readers, [&]{
+		auto const reader_threads = create_threads(number_of_readers, [&](std::stop_token token) {
 			auto data = Container<value_type>();
 			reserve(data);
 
@@ -314,36 +310,33 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 					CONCURRENT_TEST(containers::equal(bulk_data_begin, bulk_data_end, it));
 				}
 			};
-			try {
-				while (true) {
-					data = queue.pop_all(std::move(data));
-					process_data();
-					containers::clear(data);
-				}
-			} catch (boost::thread_interrupted const &) {
-				data = queue.try_pop_all(std::move(data));
+			while (!token.stop_requested()) {
+				data = queue.pop_all(token, std::move(data));
 				process_data();
+				containers::clear(data);
 			}
+			data = queue.try_pop_all(std::move(data));
+			process_data();
 		});
 
-		auto const writer_threads = create_threads(number_of_writers, [&]{
+		auto const writer_threads = create_threads(number_of_writers, [&](std::stop_token token) {
 			auto local_number_of_writes = std::uint64_t(0);
 			auto const update_count_of_writes = update_atomic(number_of_writes, local_number_of_writes);
-			while (!boost::this_thread::interruption_requested()) {
+			while (!token.stop_requested()) {
 				queue.append(bulk_data_source);
 				++local_number_of_writes;
-				boost::this_thread::yield();
+				std::this_thread::yield();
 			}
 		});
 	
-		boost::this_thread::sleep_until(start + boost::chrono::milliseconds(1000));
+		std::this_thread::sleep_until(start + std::chrono::milliseconds(1000));
 	}
 
 	auto const end = now();
 	
 	CONCURRENT_TEST(items_read == number_of_writes * bulk_size);
 
-	auto const time_taken = boost::chrono::duration_cast<boost::chrono::microseconds>(end - start).count();
+	auto const time_taken = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 	std::cout << static_cast<double>(items_read) / static_cast<double>(time_taken) << " million messages / second\n";
 	std::cout << largest_read.load() << " peak elements on queue\n";
 }

@@ -44,8 +44,6 @@ You may want to consult [the tutorial](readme.md).
 
 Except where noted otherwise, all operations are thread-safe.
 
-Any call that is documented as blocking can throw an exception of type `boost::thread_interrupted` if the the thread that is blocked is interrupted. See the documentation for `boost::thread::interrupt`.
-
 Some definitions refer to "`container`" as though it were a data member. This value is for exposition only, and can be assumed to be a value of type `container_type` that contains all current values in the queue.
 
 The behavior of any function which accepts a `time_point` or `duration` parameter is undefined if any operations on the `time_point` or `duration` calls any member functions of the queue object.
@@ -118,11 +116,21 @@ Blocks until there is data in the queue. Returns all messages in the queue. Afte
 
 `container_type` must model the [Swappable](http://en.cppreference.com/w/cpp/concept/Swappable) and [MoveConstructible](http://en.cppreference.com/w/cpp/concept/MoveConstructible) concepts. The behavior is undefined if `using std::swap; swap(container, storage);` calls any member functions on this queue object.
 
-### `container_type pop_all(boost::chrono::time_point<Clock, Duration> timeout, container_type storage = container_type{})`
+### `container_type pop_all(std::stop_token token, container_type storage = container_type{})`
 
 #### Definition
 
-Blocks until there is data in the queue or `timeout` is reached. Returns all messages in the queue. After this call, the queue's internal container is equal to the original value of `storage`. This overload will only return an empty container if the timeout is reached and there is still no data in the queue.
+Blocks until there is data in the queue or a stop request is made. Returns all messages in the queue. After this call, the queue's internal container is equal to the original value of `storage`.
+
+#### Requirements
+
+`container_type` must model the [Swappable](http://en.cppreference.com/w/cpp/concept/Swappable) and [MoveConstructible](http://en.cppreference.com/w/cpp/concept/MoveConstructible) concepts. The behavior is undefined if `using std::swap; swap(container, storage);` calls any member functions on this queue object.
+
+### `container_type pop_all(std::chrono::time_point<Clock, Duration> timeout, container_type storage = container_type{})`
+
+#### Definition
+
+Blocks until there is data in the queue or `timeout` is reached. Returns all messages in the queue. After this call, the queue's internal container is equal to the original value of `storage`.
 
 This function may block beyond `timeout` due to scheduling or resource contention delays.
 
@@ -130,11 +138,35 @@ This function may block beyond `timeout` due to scheduling or resource contentio
 
 `container_type` must model the [Swappable](http://en.cppreference.com/w/cpp/concept/Swappable) and [MoveConstructible](http://en.cppreference.com/w/cpp/concept/MoveConstructible) concepts. The behavior is undefined if `using std::swap; swap(container, storage);` calls any member functions on this queue object.
 
-### `container_type pop_all(boost::chrono::duration<Rep, Period> timeout, container_type storage = container_type{})`
+### `container_type pop_all(std::stop_token token, std::chrono::time_point<Clock, Duration> timeout, container_type storage = container_type{})`
 
 #### Definition
 
-Blocks until there is data in the queue or `timeout` time has passed. Returns all messages in the queue. After this call, the queue's internal container is equal to the original value of `storage`. This overload will only return an empty container if `timeout` time has passed and there is still no data in the queue.
+Blocks until there is data in the queue, a stop request is made, or `timeout` is reached. Returns all messages in the queue. After this call, the queue's internal container is equal to the original value of `storage`.
+
+This function may block beyond `timeout` due to scheduling or resource contention delays.
+
+#### Requirements
+
+`container_type` must model the [Swappable](http://en.cppreference.com/w/cpp/concept/Swappable) and [MoveConstructible](http://en.cppreference.com/w/cpp/concept/MoveConstructible) concepts. The behavior is undefined if `using std::swap; swap(container, storage);` calls any member functions on this queue object.
+
+### `container_type pop_all(std::chrono::duration<Rep, Period> timeout, container_type storage = container_type{})`
+
+#### Definition
+
+Blocks until there is data in the queue or `timeout` time has passed. Returns all messages in the queue. After this call, the queue's internal container is equal to the original value of `storage`.
+
+A steady clock is used to measure the duration. This function may block for longer than `timeout` due to scheduling or resource contention delays. 
+
+#### Requirements
+
+`container_type` must model the [Swappable](http://en.cppreference.com/w/cpp/concept/Swappable) and [MoveConstructible](http://en.cppreference.com/w/cpp/concept/MoveConstructible) concepts. The behavior is undefined if `using std::swap; swap(container, storage);` calls any member functions on this queue object.
+
+### `container_type pop_all(std::stop_token token, std::chrono::duration<Rep, Period> timeout, container_type storage = container_type{})`
+
+#### Definition
+
+Blocks until there is data in the queue, a stop request is made, or `timeout` time has passed. Returns all messages in the queue. After this call, the queue's internal container is equal to the original value of `storage`.
 
 A steady clock is used to measure the duration. This function may block for longer than `timeout` due to scheduling or resource contention delays. 
 
@@ -170,11 +202,23 @@ Blocks until there is data in the queue. Returns the first element in the queue 
 
 The expression `container.front()` must produce a value of (possible reference-qualified) `value_type`. `container.pop_front()` must be valid and remove the first element from the container. The behavior is undefined if `container.front()` or `container.pop_front()` calls any member functions on this queue object.
 
-### `boost::optional<value_type> pop_one(boost::chrono::time_point<Clock, Duration> timeout)`
+### `std::optional<value_type> pop_one(std::stop_token token)`
 
 #### Definition
 
-Blocks until there is data in the queue or `timeout` is reached. Returns the first element in the queue and removes it from the queue. If there is no element in the queue because the timeout was reached, returns `boost::none`. 
+Blocks until there is data in the queue or a stop request is made. Returns the first element in the queue and removes it from the queue. If there is no element in the queue because a stop request was made, returns `std::nullopt`.
+
+#### Requirements
+
+`value_type` must model the [MoveConstructible](http://en.cppreference.com/w/cpp/concept/MoveConstructible) concept. The behavior is undefined if the move constructor calls any member functions on this queue object.
+
+The expression `container.front()` must produce a value of (possible reference-qualified) `value_type`. `container.pop_front()` must be valid and remove the first element from the container. The behavior is undefined if `container.front()` or `container.pop_front()` calls any member functions on this queue object.
+
+### `std::optional<value_type> pop_one(std::chrono::time_point<Clock, Duration> timeout)`
+
+#### Definition
+
+Blocks until there is data in the queue or `timeout` is reached. Returns the first element in the queue and removes it from the queue. If there is no element in the queue because the timeout was reached, returns `std::nullopt`. 
 
 This function may block beyond `timeout` due to scheduling or resource contention delays.
 
@@ -184,11 +228,39 @@ This function may block beyond `timeout` due to scheduling or resource contentio
 
 The expression `container.front()` must produce a value of (possible reference-qualified) `value_type`. `container.pop_front()` must be valid and remove the first element from the container. The behavior is undefined if `container.front()` or `container.pop_front()` calls any member functions on this queue object.
 
-### `boost::optional<value_type> pop_one(boost::chrono::duration<Rep, Period> timeout)`
+### `std::optional<value_type> pop_one(std::stop_token token, std::chrono::time_point<Clock, Duration> timeout)`
 
 #### Definition
 
-Blocks until there is data in the queue or `timeout` time has passed. Returns the first element in the queue and removes it from the queue. If there is no element in the queue because the timeout was reached, returns `boost::none`. 
+Blocks until there is data in the queue, a stop request is made, or `timeout` is reached. Returns the first element in the queue and removes it from the queue. If there is no element in the queue because a stop request was made or the timeout was reached, returns `std::nullopt`. 
+
+This function may block beyond `timeout` due to scheduling or resource contention delays.
+
+#### Requirements
+
+`value_type` must model the [MoveConstructible](http://en.cppreference.com/w/cpp/concept/MoveConstructible) concept. The behavior is undefined if the move constructor calls any member functions on this queue object.
+
+The expression `container.front()` must produce a value of (possible reference-qualified) `value_type`. `container.pop_front()` must be valid and remove the first element from the container. The behavior is undefined if `container.front()` or `container.pop_front()` calls any member functions on this queue object.
+
+### `std::optional<value_type> pop_one(std::chrono::duration<Rep, Period> timeout)`
+
+#### Definition
+
+Blocks until there is data in the queue or `timeout` time has passed. Returns the first element in the queue and removes it from the queue. If there is no element in the queue because the timeout was reached, returns `std::nullopt`. 
+
+A steady clock is used to measure the duration. This function may block for longer than `timeout` due to scheduling or resource contention delays. 
+
+#### Requirements
+
+`value_type` must model the [MoveConstructible](http://en.cppreference.com/w/cpp/concept/MoveConstructible) concept. The behavior is undefined if the move constructor calls any member functions on this queue object.
+
+The expression `container.front()` must produce a value of (possible reference-qualified) `value_type`. `container.pop_front()` must be valid and remove the first element from the container. The behavior is undefined if `container.front()` or `container.pop_front()` calls any member functions on this queue object.
+
+### `std::optional<value_type> pop_one(std::stop_token token, std::chrono::duration<Rep, Period> timeout)`
+
+#### Definition
+
+Blocks until there is data in the queue, a stop request is made, or `timeout` time has passed. Returns the first element in the queue and removes it from the queue. If there is no element in the queue because a stop request was made or the timeout was reached, returns `std::nullopt`. 
 
 A steady clock is used to measure the duration. This function may block for longer than `timeout` due to scheduling or resource contention delays. 
 
@@ -201,11 +273,11 @@ The expression `container.front()` must produce a value of (possible reference-q
 
 ## try_pop_one
 
-### `boost::optional<value_type> try_pop_one()`
+### `std::optional<value_type> try_pop_one()`
 
 #### Definition
 
-Returns the first element in the queue and removes it from the queue if the queue is not empty, otherwise, returns `boost::none`. 
+Returns the first element in the queue and removes it from the queue if the queue is not empty, otherwise, returns `std::nullopt`. 
 
 #### Requirements
 
@@ -268,9 +340,7 @@ Returns the maximum size of the queue.
 
 # Supported Compilers
 
-This library requires C++14 support. The specific features used require one of the following (or newer)
+This library requires C++20 support. The specific features used require one of the following (or newer)
 
-* clang 3.4
-* gcc 4.9
-* Visual Studio 2015 (MSVC 19.0, Visual Studio 14)
-
+* clang 13.0.1
+* gcc 12.1.0

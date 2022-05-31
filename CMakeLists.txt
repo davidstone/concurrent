@@ -11,26 +11,17 @@ enable_testing()
 
 get_directory_property(has_parent PARENT_DIRECTORY)
 if (NOT has_parent)
-	set(CMAKE_CXX_STANDARD 20)
+	set(CMAKE_CXX_STANDARD 23)
 	set(CMAKE_CXX_STANDARD_REQUIRED On)
 	set(CMAKE_CXX_EXTENSIONS Off)
 
 	add_subdirectory(dependencies/cmake_strict_defaults)
 	add_subdirectory(dependencies/bounded)
-	find_package(Boost COMPONENTS program_options thread REQUIRED)
-	add_library(boost INTERFACE IMPORTED)
-	target_compile_definitions(boost INTERFACE
-		BOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING
-		BOOST_CHRONO_HEADER_ONLY
-	)
-	set_property(TARGET boost PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIR})
 endif()
 
 add_library(concurrent_queue INTERFACE)
 
 target_link_libraries(concurrent_queue INTERFACE
-	boost
-	boost_thread
 	strict_defaults_interface
 	bounded
 	containers
