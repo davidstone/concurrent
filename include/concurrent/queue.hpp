@@ -21,6 +21,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <optional>
+#include <stop_token>
 #include <thread>
 #include <type_traits>
 #include <utility>
