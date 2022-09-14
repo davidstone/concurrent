@@ -17,6 +17,18 @@ if (NOT has_parent)
 
 	add_subdirectory(dependencies/cmake_strict_defaults)
 	add_subdirectory(dependencies/bounded)
+	add_subdirectory(dependencies/Catch2 EXCLUDE_FROM_ALL)
+	add_subdirectory(dependencies/numeric-traits)
+	add_subdirectory(dependencies/operators)
+
+	set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable testing benchmark.")
+	add_subdirectory(dependencies/benchmark EXCLUDE_FROM_ALL)
+	if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+		target_compile_options(benchmark PUBLIC
+			"-Wno-global-constructors"
+			"-Wno-shift-sign-overflow"
+		)
+	endif()
 endif()
 
 add_library(concurrent_queue INTERFACE)

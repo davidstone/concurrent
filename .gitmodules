@@ -1,3 +1,18 @@
 [submodule "dependencies/cmake_strict_defaults"]
 	path = dependencies/cmake_strict_defaults
 	url = https://github.com/davidstone/cmake_strict_defaults
+[submodule "dependencies/Catch2"]
+	path = dependencies/Catch2
+	url = git@github.com:catchorg/Catch2.git
+[submodule "dependencies/operators"]
+	path = dependencies/operators
+	url = https://github.com/davidstone/operators.git
+[submodule "dependencies/numeric-traits"]
+	path = dependencies/numeric-traits
+	url = https://github.com/davidstone/numeric-traits.git
+[submodule "dependencies/benchmark"]
+	path = dependencies/benchmark
+	url = git@github.com:google/benchmark.git
+[submodule "dependencies/bounded"]
+	path = dependencies/bounded
+	url = https://github.com/davidstone/bounded-integer
