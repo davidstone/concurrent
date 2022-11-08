@@ -5,8 +5,6 @@
 
 #include <concurrent/queue.hpp>
 
-#include <bounded/scope_guard.hpp>
-
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -139,7 +137,7 @@ TEST_CASE("copy move", "concurrent_queue") {
 auto now() {
 	return std::chrono::steady_clock::now();
 }
-auto const duration = std::chrono::milliseconds(100);
+constexpr auto duration = std::chrono::milliseconds(100);
 
 TEST_CASE("timeout", "concurrent_queue") {
 	auto queue = concurrent::unbounded_queue<int>{};
