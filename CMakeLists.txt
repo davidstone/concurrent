@@ -56,6 +56,7 @@ add_executable(concurrent_queue_test
 target_link_libraries(concurrent_queue_test
 	concurrent_queue
 	strict_defaults
+	Catch2::Catch2WithMain
 )
 add_test(concurrent_queue_test concurrent_queue_test)
 

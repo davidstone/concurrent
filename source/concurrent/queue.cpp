@@ -13,37 +13,25 @@
 #include <string>
 #include <utility>
 
-#if defined NDEBUG
-	#define CONCURRENT_NDEBUG_WAS_DEFINED NDEBUG
-	#undef NDEBUG
-#endif
-
-#include <cassert>
-
-// Like assert, but always evaluated
-#define CONCURRENT_TEST assert
-
-#if defined CONCURRENT_NDEBUG_WAS_DEFINED
-	#undef CONCURRENT_NDEBUG_WAS_DEFINED
-#endif
+#include <catch2/catch_test_macros.hpp>
 
 namespace {
 
-void test_int() {
+TEST_CASE("int", "concurrent_queue") {
 	auto queue = concurrent::unbounded_queue<int>{};
 	queue.emplace(0);
 	queue.push(7);
 	auto const first_values = queue.pop_all();
-	CONCURRENT_TEST(size(first_values) == 2);
-	CONCURRENT_TEST(first_values[0] == 0);
-	CONCURRENT_TEST(first_values[1] == 7);
+	CHECK(size(first_values) == 2);
+	CHECK(first_values[0] == 0);
+	CHECK(first_values[1] == 7);
 	queue.push(4);
 	auto const second_values = queue.pop_all();
-	CONCURRENT_TEST(size(second_values) == 1);
+	CHECK(size(second_values) == 1);
 }
 
 // Tests ranges and conversions
-void test_string() {
+TEST_CASE("string", "concurrent_queue") {
 	auto queue = concurrent::unbounded_queue<std::string>{};
 	queue.emplace("Reese");
 	queue.push("Finch");
@@ -55,7 +43,7 @@ void test_string() {
 	auto const expected = std::array<char const *, 4>{
 		"Reese", "Finch", "Carter", "Fusco"
 	};
-	CONCURRENT_TEST(std::equal(values.begin(), values.end(), expected.begin(), expected.end()));
+	CHECK(std::equal(values.begin(), values.end(), expected.begin(), expected.end()));
 }
 
 
@@ -106,7 +94,7 @@ private:
 	static inline std::size_t s_move_assigned = 0;
 };
 
-void test_copy_move() {
+TEST_CASE("copy move", "concurrent_queue") {
 	// Some of these tests will fail if the standard library implementation
 	// makes unnecessary copies / moves.
 	auto queue = concurrent::unbounded_queue<copy_move_counter>{};
@@ -114,11 +102,11 @@ void test_copy_move() {
 	auto expected_copy_constructed = static_cast<std::size_t>(0);
 	auto expected_move_constructed = static_cast<std::size_t>(0);
 	auto check_all = [&]{
-		CONCURRENT_TEST(copy_move_counter::default_constructed() == expected_default_constructed);
-		CONCURRENT_TEST(copy_move_counter::copy_constructed() == expected_copy_constructed);
-		CONCURRENT_TEST(copy_move_counter::move_constructed() == expected_move_constructed);
-		CONCURRENT_TEST(copy_move_counter::copy_assigned() == 0);
-		CONCURRENT_TEST(copy_move_counter::move_assigned() == 0);
+		CHECK(copy_move_counter::default_constructed() == expected_default_constructed);
+		CHECK(copy_move_counter::copy_constructed() == expected_copy_constructed);
+		CHECK(copy_move_counter::move_constructed() == expected_move_constructed);
+		CHECK(copy_move_counter::copy_assigned() == 0);
+		CHECK(copy_move_counter::move_assigned() == 0);
 	};
 
 	check_all();
@@ -153,7 +141,7 @@ auto now() {
 }
 auto const duration = std::chrono::milliseconds(100);
 
-void test_timeout() {
+TEST_CASE("timeout", "concurrent_queue") {
 	auto queue = concurrent::unbounded_queue<int>{};
 	auto const before_time_point = now();
 	auto const values_time_point = queue.pop_all(before_time_point + duration);
@@ -161,24 +149,23 @@ void test_timeout() {
 	auto const values_duration = queue.pop_all(duration);
 	auto const after_duration = now();
 
-	CONCURRENT_TEST(after_time_point - before_time_point >= duration);
-	CONCURRENT_TEST(after_duration - after_time_point >= duration);
+	CHECK(after_time_point - before_time_point >= duration);
+	CHECK(after_duration - after_time_point >= duration);
 
-	CONCURRENT_TEST(empty(values_time_point));
-	CONCURRENT_TEST(empty(values_duration));
+	CHECK(empty(values_time_point));
+	CHECK(empty(values_duration));
 	
 	queue.push(0);
 	auto const should_be_fast = queue.pop_all(std::chrono::hours(24 * 365));
-	CONCURRENT_TEST(size(should_be_fast) == 1);
-	CONCURRENT_TEST(should_be_fast[0] == 0);
+	CHECK(size(should_be_fast) == 1);
+	CHECK(should_be_fast[0] == 0);
 	
 	auto const immediate = queue.try_pop_all();
-	CONCURRENT_TEST(empty(immediate));
+	CHECK(empty(immediate));
 }
 
 
-
-void test_blocking() {
+TEST_CASE("blocking", "concurrent_queue") {
 	auto queue = concurrent::unbounded_queue<int>{};
 	auto const value = 6;
 	auto const time_to_wake_up = now() + duration;
@@ -187,20 +174,9 @@ void test_blocking() {
 		queue.emplace(value);
 	});
 	auto const result = queue.pop_all();
-	CONCURRENT_TEST(now() >= time_to_wake_up);
-	CONCURRENT_TEST(size(result) == 1);
-	CONCURRENT_TEST(result.front() == value);
+	CHECK(now() >= time_to_wake_up);
+	CHECK(size(result) == 1);
+	CHECK(result.front() == value);
 }
 
 } // namespace
-
-auto main() -> int {
-	test_int();
-	test_string();
-
-#ifndef _MSC_VER
-	test_copy_move();
-#endif
-	test_timeout();
-	test_blocking();
-}
