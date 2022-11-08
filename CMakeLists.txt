@@ -53,10 +53,17 @@ endif()
 add_executable(concurrent_queue_test
 	source/concurrent/queue.cpp
 )
-
 target_link_libraries(concurrent_queue_test
 	concurrent_queue
 	strict_defaults
 )
-
 add_test(concurrent_queue_test concurrent_queue_test)
+
+add_executable(concurrent_queue_benchmark
+	source/concurrent/benchmark.cpp
+)
+target_link_libraries(concurrent_queue_benchmark
+	benchmark
+	concurrent_queue
+	strict_defaults
+)
