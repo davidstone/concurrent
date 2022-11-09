@@ -60,28 +60,28 @@ struct copy_move_counter {
 	// The assignment operators must exist, because they theoretically can get
 	// called on some code paths, but in reality they cannot because we only
 	// insert at the end of the vector.
-	copy_move_counter & operator=(copy_move_counter const &) noexcept {
+	auto operator=(copy_move_counter const &) noexcept -> copy_move_counter & {
 		++s_copy_assigned;
 		return *this;
 	}
-	copy_move_counter & operator=(copy_move_counter &&) noexcept {
+	auto operator=(copy_move_counter &&) noexcept -> copy_move_counter & {
 		++s_move_assigned;
 		return *this;
 	}
 	
-	static std::size_t default_constructed() noexcept {
+	static auto default_constructed() noexcept -> std::size_t {
 		return s_default_constructed;
 	}
-	static std::size_t copy_constructed() noexcept {
+	static auto copy_constructed() noexcept -> std::size_t {
 		return s_copy_constructed;
 	}
-	static std::size_t move_constructed() noexcept {
+	static auto move_constructed() noexcept -> std::size_t {
 		return s_move_constructed;
 	}
-	static std::size_t copy_assigned() noexcept {
+	static auto copy_assigned() noexcept -> std::size_t {
 		return s_copy_assigned;
 	}
-	static std::size_t move_assigned() noexcept {
+	static auto move_assigned() noexcept -> std::size_t {
 		return s_move_assigned;
 	}
 private:

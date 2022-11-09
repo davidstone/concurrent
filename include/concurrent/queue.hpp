@@ -49,7 +49,7 @@ struct basic_queue_impl {
 		generic_add(adding_several, [&]{ containers::append(m_container, OPERATORS_FORWARD(input)); });
 	}
 
-	bool non_blocking_append(containers::range auto && input) {
+	auto non_blocking_append(containers::range auto && input) -> bool {
 		constexpr auto adding_several = std::true_type{};
 		return generic_non_blocking_add(adding_several, [&]{ containers::append(m_container, OPERATORS_FORWARD(input)); });
 	}
@@ -67,14 +67,14 @@ struct basic_queue_impl {
 	}
 
 	template<typename... Args>
-	bool non_blocking_emplace(Args && ... args) {
+	auto non_blocking_emplace(Args && ... args) -> bool {
 		constexpr auto adding_several = std::false_type{};
 		return generic_non_blocking_add(adding_several, [&]{ containers::emplace_back(m_container, std::forward<Args>(args)...); });
 	}
-	bool non_blocking_push(value_type && value) {
+	auto non_blocking_push(value_type && value) -> bool {
 		return non_blocking_emplace(std::move(value));
 	}
-	bool non_blocking_push(value_type const & value) {
+	auto non_blocking_push(value_type const & value) -> bool {
 		return non_blocking_emplace(value);
 	}
 
@@ -94,12 +94,12 @@ struct basic_queue_impl {
 
 	// This overload never returns an empty container. If the queue is empty,
 	// this will block
-	Container pop_all(Container storage = Container{}) {
+	auto pop_all(Container storage = Container{}) -> Container {
 		return generic_pop_all(wait_for_data(), std::move(storage));
 	}
 	// This overload can return an empty container if a stop was requested. If
 	// the queue is empty, this will block.
-	Container pop_all(std::stop_token token, Container storage = Container{}) {
+	auto pop_all(std::stop_token token, Container storage = Container{}) -> Container {
 		return generic_pop_all(wait_for_data(std::move(token)), std::move(storage));
 	}
 
@@ -107,34 +107,34 @@ struct basic_queue_impl {
 	// unless the timeout is reached, in which case they return an empty
 	// container.
 	template<typename Clock, typename Duration>
-	Container pop_all(std::chrono::time_point<Clock, Duration> const timeout, Container storage = Container{}) {
+	auto pop_all(std::chrono::time_point<Clock, Duration> const timeout, Container storage = Container{}) -> Container {
 		return generic_pop_all(wait_for_data(timeout), std::move(storage));
 	}
 	template<typename Clock, typename Duration>
-	Container pop_all(std::stop_token token, std::chrono::time_point<Clock, Duration> const timeout, Container storage = Container{}) {
+	auto pop_all(std::stop_token token, std::chrono::time_point<Clock, Duration> const timeout, Container storage = Container{}) -> Container {
 		return generic_pop_all(wait_for_data(std::move(token), timeout), std::move(storage));
 	}
 	template<typename Rep, typename Period>
-	Container pop_all(std::chrono::duration<Rep, Period> const timeout, Container storage = Container{}) {
+	auto pop_all(std::chrono::duration<Rep, Period> const timeout, Container storage = Container{}) -> Container {
 		return generic_pop_all(wait_for_data(timeout), std::move(storage));
 	}
 	template<typename Rep, typename Period>
-	Container pop_all(std::stop_token token, std::chrono::duration<Rep, Period> const timeout, Container storage = Container{}) {
+	auto pop_all(std::stop_token token, std::chrono::duration<Rep, Period> const timeout, Container storage = Container{}) -> Container {
 		return generic_pop_all(wait_for_data(std::move(token), timeout), std::move(storage));
 	}
 
 	// Does not wait for data (can return an empty container)
-	container_type try_pop_all(container_type storage = container_type{}) {
+	auto try_pop_all(Container storage = Container{}) -> Container {
 		return generic_pop_all(lock_type(m_mutex), std::move(storage));
 	}
 
 
 
 	// If the queue is empty, this will block.
-	value_type pop_one() {
+	auto pop_one() -> value_type {
 		return generic_pop_one(wait_for_data());
 	}
-	std::optional<value_type> pop_one(std::stop_token token) {
+	auto pop_one(std::stop_token token) -> std::optional<value_type> {
 		auto lock = wait_for_data(std::move(token));
 		if (containers::is_empty(m_container)) {
 			return std::nullopt;
@@ -146,7 +146,7 @@ struct basic_queue_impl {
 	// available, unless the timeout is reached, in which case they return
 	// std::nullopt
 	template<typename Clock, typename Duration>
-	std::optional<value_type> pop_one(std::chrono::time_point<Clock, Duration> const timeout) {
+	auto pop_one(std::chrono::time_point<Clock, Duration> const timeout) -> std::optional<value_type> {
 		auto lock = wait_for_data(timeout);
 		if (containers::is_empty(m_container)) {
 			return std::nullopt;
@@ -154,7 +154,7 @@ struct basic_queue_impl {
 		return generic_pop_one(std::move(lock));
 	}
 	template<typename Clock, typename Duration>
-	std::optional<value_type> pop_one(std::stop_token token, std::chrono::time_point<Clock, Duration> const timeout) {
+	auto pop_one(std::stop_token token, std::chrono::time_point<Clock, Duration> const timeout) -> std::optional<value_type> {
 		auto lock = wait_for_data(std::move(token), timeout);
 		if (containers::is_empty(m_container)) {
 			return std::nullopt;
@@ -162,7 +162,7 @@ struct basic_queue_impl {
 		return generic_pop_one(std::move(lock));
 	}
 	template<typename Rep, typename Period>
-	std::optional<value_type> pop_one(std::chrono::duration<Rep, Period> const timeout) {
+	auto pop_one(std::chrono::duration<Rep, Period> const timeout) -> std::optional<value_type> {
 		auto lock = wait_for_data(timeout);
 		if (containers::is_empty(m_container)) {
 			return std::nullopt;
@@ -170,7 +170,7 @@ struct basic_queue_impl {
 		return generic_pop_one(std::move(lock));
 	}
 	template<typename Rep, typename Period>
-	std::optional<value_type> pop_one(std::stop_token token, std::chrono::duration<Rep, Period> const timeout) {
+	auto pop_one(std::stop_token token, std::chrono::duration<Rep, Period> const timeout) -> std::optional<value_type> {
 		auto lock = wait_for_data(std::move(token), timeout);
 		if (containers::is_empty(m_container)) {
 			return std::nullopt;
@@ -178,7 +178,7 @@ struct basic_queue_impl {
 		return generic_pop_one(std::move(lock));
 	}
 
-	std::optional<value_type> try_pop_one() {
+	auto try_pop_one() -> std::optional<value_type> {
 		auto lock = lock_type(m_mutex);
 		if (containers::is_empty(m_container)) {
 			return std::nullopt;
@@ -187,7 +187,7 @@ struct basic_queue_impl {
 	}
 
 
-	void clear() {
+	auto clear() -> void {
 		auto const lock = lock_type(m_mutex);
 		auto const previous_size = containers::size(m_container);
 		containers::clear(m_container);
@@ -196,7 +196,7 @@ struct basic_queue_impl {
 
 
 	template<typename Capacity>
-	void reserve(Capacity const new_capacity) {
+	auto reserve(Capacity const new_capacity) -> void {
 		auto lock = lock_type(m_mutex);
 		m_container.reserve(new_capacity);
 	}
@@ -212,43 +212,43 @@ private:
 		return [&]{ return !containers::is_empty(m_container); };
 	}
 
-	auto wait_for_data(std::stop_token token) {
+	auto wait_for_data(std::stop_token token) -> lock_type {
 		auto lock = lock_type(m_mutex);
 		m_notify_addition.wait(lock, std::move(token), is_not_empty());
 		return lock;
 	}
-	auto wait_for_data() {
+	auto wait_for_data() -> lock_type {
 		auto lock = lock_type(m_mutex);
 		m_notify_addition.wait(lock, is_not_empty());
 		return lock;
 	}
 	template<typename Clock, typename Duration>
-	auto wait_for_data(std::chrono::time_point<Clock, Duration> const timeout) {
+	auto wait_for_data(std::chrono::time_point<Clock, Duration> const timeout) -> lock_type {
 		auto lock = lock_type(m_mutex);
 		m_notify_addition.wait_until(lock, timeout, is_not_empty());
 		return lock;
 	}
 	template<typename Clock, typename Duration>
-	auto wait_for_data(std::stop_token token, std::chrono::time_point<Clock, Duration> const timeout) {
+	auto wait_for_data(std::stop_token token, std::chrono::time_point<Clock, Duration> const timeout) -> lock_type {
 		auto lock = lock_type(m_mutex);
 		m_notify_addition.wait_until(lock, std::move(token), timeout, is_not_empty());
 		return lock;
 	}
 	template<typename Rep, typename Period>
-	auto wait_for_data(std::chrono::duration<Rep, Period> const timeout) {
+	auto wait_for_data(std::chrono::duration<Rep, Period> const timeout) -> lock_type {
 		auto lock = lock_type(m_mutex);
 		m_notify_addition.wait_for(lock, timeout, is_not_empty());
 		return lock;
 	}
 	template<typename Rep, typename Period>
-	auto wait_for_data(std::stop_token token, std::chrono::duration<Rep, Period> const timeout) {
+	auto wait_for_data(std::stop_token token, std::chrono::duration<Rep, Period> const timeout) -> lock_type {
 		auto lock = lock_type(m_mutex);
 		m_notify_addition.wait_for(lock, std::move(token), timeout, is_not_empty());
 		return lock;
 	}
 
 
-	Derived & derived() {
+	auto derived() -> Derived & {
 		return static_cast<Derived &>(*this);
 	}
 
@@ -259,7 +259,7 @@ private:
 	}
 
 	template<typename Bool, typename Function>
-	bool generic_non_blocking_add(Bool const adding_several, Function && add) {
+	auto generic_non_blocking_add(Bool const adding_several, Function && add) -> bool {
 		auto lock = lock_type(m_mutex, std::try_to_lock);
 		if (!lock.owns_lock()) {
 			return false;
@@ -318,7 +318,7 @@ private:
 
 
 	// lock must be in the locked state
-	container_type generic_pop_all(lock_type lock, container_type storage) {
+	auto generic_pop_all(lock_type lock, Container storage) -> Container {
 		using std::swap;
 		swap(m_container, storage);
 		derived().handle_remove_all(containers::size(storage));
@@ -327,7 +327,7 @@ private:
 	}
 
 	// lock must be in the locked state
-	value_type generic_pop_one(lock_type lock) {
+	auto generic_pop_one(lock_type lock) -> value_type {
 		auto const previous_size = containers::size(m_container);
 		auto result = std::move(containers::front(m_container));
 		containers::pop_front(m_container);
@@ -336,7 +336,7 @@ private:
 		return result;
 	}
 
-	container_type m_container;
+	Container m_container;
 	mutable Mutex m_mutex;
 	std::condition_variable_any m_notify_addition;
 };
@@ -374,11 +374,11 @@ public:
 private:
 	friend base;
 
-	void handle_add(Container &, std::unique_lock<Mutex> &) {
+	auto handle_add(Container &, std::unique_lock<Mutex> &) -> void {
 	}
-	void handle_remove_all(containers::range_size_t<Container>) {
+	auto handle_remove_all(containers::range_size_t<Container>) -> void {
 	}
-	void handle_remove_one(containers::range_size_t<Container>) {
+	auto handle_remove_one(containers::range_size_t<Container>) -> void {
 	}
 };
 
@@ -427,18 +427,18 @@ public:
 private:
 	friend base;
 
-	void handle_add(Container & queue, std::unique_lock<Mutex> & lock) {
+	auto handle_add(Container & queue, std::unique_lock<Mutex> & lock) -> void {
 		m_notify_removal.wait(lock, [&]{ return containers::size(queue) < m_max_size; });
 	}
-	void handle_add(Container & queue, std::stop_token token, std::unique_lock<Mutex> & lock) {
+	auto handle_add(Container & queue, std::stop_token token, std::unique_lock<Mutex> & lock) -> void {
 		m_notify_removal.wait(lock, std::move(token), [&]{ return containers::size(queue) < m_max_size; });
 	}
-	void handle_remove_all(containers::range_size_t<Container> const previous_size) {
+	auto handle_remove_all(containers::range_size_t<Container> const previous_size) -> void {
 		if (previous_size >= max_size()) {
 			m_notify_removal.notify_all();
 		}
 	}
-	void handle_remove_one(containers::range_size_t<Container> const previous_size) {
+	auto handle_remove_one(containers::range_size_t<Container> const previous_size) -> void {
 		if (previous_size >= max_size()) {
 			m_notify_removal.notify_one();
 		}
