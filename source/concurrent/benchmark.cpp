@@ -127,8 +127,8 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 			auto process_data = [&] {
 				auto const count = size(data);
 				local_largest_read = std::max(local_largest_read, static_cast<std::size_t>(count));
-				local_items_read += count;
-				CONCURRENT_TEST(count % bulk_size == 0_bi);
+				local_items_read += static_cast<std::uint64_t>(count);
+				CONCURRENT_TEST(static_cast<std::size_t>(count) % bulk_size == 0);
 				for (auto it = begin(data); it != end(data); it += bounded::assume_in_range(bulk_size, 0_bi, bounded::constant<reserved_size>)) {
 					CONCURRENT_TEST(containers::equal(bulk_data_begin, bulk_data_end, it));
 				}
