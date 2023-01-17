@@ -17,8 +17,9 @@ If you have multiple threads that need to communicate, you need some way to do s
 This is a sample program that has two producer threads that are generating the numbers from 0 to 9 and one reader thread that prints the numbers as it sees them. This demonstrates typical usage of a `concurrent::unbounded_queue`.
 
 ```
-#include <concurrent/queue.hpp>
 #include <thread>
+
+import concurrent_queue;
 
 struct producer_t {
 	explicit producer_t(concurrent::unbounded_queue<int> & queue):

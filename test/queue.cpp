@@ -3,15 +3,12 @@
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-#include <concurrent/queue.hpp>
-
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <string>
-#include <utility>
-
+#include <compare>
 #include <catch2/catch_test_macros.hpp>
+
+import concurrent_queue;
+import containers;
+import std_module;
 
 namespace {
 
@@ -41,7 +38,7 @@ TEST_CASE("string", "concurrent_queue") {
 	auto const expected = std::array<char const *, 4>{
 		"Reese", "Finch", "Carter", "Fusco"
 	};
-	CHECK(std::equal(values.begin(), values.end(), expected.begin(), expected.end()));
+	CHECK(containers::equal(values, expected));
 }
 
 

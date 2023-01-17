@@ -7,27 +7,17 @@
 // multi-consumer context. It is optimized for a single consumer, as the entire
 // queue is drained whenever you request more data.
 
-#pragma once
+module;
 
-#include <containers/append.hpp>
-#include <containers/clear.hpp>
-#include <containers/emplace_back.hpp>
-#include <containers/front_back.hpp>
-#include <containers/is_empty.hpp>
-#include <containers/pop_front.hpp>
-#include <containers/size.hpp>
+#include <operators/forward.hpp>
 
-#include <chrono>
-#include <condition_variable>
-#include <mutex>
-#include <optional>
-#include <stop_token>
-#include <thread>
-#include <type_traits>
-#include <utility>
+export module concurrent_queue;
+
+import containers;
+import tv;
+import std_module;
 
 namespace concurrent {
-namespace detail {
 
 template<typename Container>
 concept pop_frontable = requires(Container & container) { containers::pop_front(container); };
@@ -57,7 +47,7 @@ struct basic_queue_impl {
 	template<typename... Args>
 	auto emplace(Args && ... args) -> void {
 		constexpr auto adding_several = std::false_type{};
-		generic_add(adding_several, [&]{ containers::emplace_back(m_container, std::forward<Args>(args)...); });
+		generic_add(adding_several, [&]{ containers::emplace_back(m_container, OPERATORS_FORWARD(args)...); });
 	}
 	auto push(value_type && value) -> void {
 		emplace(std::move(value));
@@ -69,7 +59,7 @@ struct basic_queue_impl {
 	template<typename... Args>
 	auto non_blocking_emplace(Args && ... args) -> bool {
 		constexpr auto adding_several = std::false_type{};
-		return generic_non_blocking_add(adding_several, [&]{ containers::emplace_back(m_container, std::forward<Args>(args)...); });
+		return generic_non_blocking_add(adding_several, [&]{ containers::emplace_back(m_container, OPERATORS_FORWARD(args)...); });
 	}
 	auto non_blocking_push(value_type && value) -> bool {
 		return non_blocking_emplace(std::move(value));
@@ -134,54 +124,54 @@ struct basic_queue_impl {
 	auto pop_one() -> value_type {
 		return generic_pop_one(wait_for_data());
 	}
-	auto pop_one(std::stop_token token) -> std::optional<value_type> {
+	auto pop_one(std::stop_token token) -> tv::optional<value_type> {
 		auto lock = wait_for_data(std::move(token));
 		if (containers::is_empty(m_container)) {
-			return std::nullopt;
+			return tv::none;
 		}
 		return generic_pop_one(std::move(lock));
 	}
 
 	// The versions with a timeout will return as soon as there is data
 	// available, unless the timeout is reached, in which case they return
-	// std::nullopt
+	// tv::none
 	template<typename Clock, typename Duration>
-	auto pop_one(std::chrono::time_point<Clock, Duration> const timeout) -> std::optional<value_type> {
+	auto pop_one(std::chrono::time_point<Clock, Duration> const timeout) -> tv::optional<value_type> {
 		auto lock = wait_for_data(timeout);
 		if (containers::is_empty(m_container)) {
-			return std::nullopt;
+			return tv::none;
 		}
 		return generic_pop_one(std::move(lock));
 	}
 	template<typename Clock, typename Duration>
-	auto pop_one(std::stop_token token, std::chrono::time_point<Clock, Duration> const timeout) -> std::optional<value_type> {
+	auto pop_one(std::stop_token token, std::chrono::time_point<Clock, Duration> const timeout) -> tv::optional<value_type> {
 		auto lock = wait_for_data(std::move(token), timeout);
 		if (containers::is_empty(m_container)) {
-			return std::nullopt;
+			return tv::none;
 		}
 		return generic_pop_one(std::move(lock));
 	}
 	template<typename Rep, typename Period>
-	auto pop_one(std::chrono::duration<Rep, Period> const timeout) -> std::optional<value_type> {
+	auto pop_one(std::chrono::duration<Rep, Period> const timeout) -> tv::optional<value_type> {
 		auto lock = wait_for_data(timeout);
 		if (containers::is_empty(m_container)) {
-			return std::nullopt;
+			return tv::none;
 		}
 		return generic_pop_one(std::move(lock));
 	}
 	template<typename Rep, typename Period>
-	auto pop_one(std::stop_token token, std::chrono::duration<Rep, Period> const timeout) -> std::optional<value_type> {
+	auto pop_one(std::stop_token token, std::chrono::duration<Rep, Period> const timeout) -> tv::optional<value_type> {
 		auto lock = wait_for_data(std::move(token), timeout);
 		if (containers::is_empty(m_container)) {
-			return std::nullopt;
+			return tv::none;
 		}
 		return generic_pop_one(std::move(lock));
 	}
 
-	auto try_pop_one() -> std::optional<value_type> {
+	auto try_pop_one() -> tv::optional<value_type> {
 		auto lock = lock_type(m_mutex);
 		if (containers::is_empty(m_container)) {
-			return std::nullopt;
+			return tv::none;
 		}
 		return generic_pop_one(std::move(lock));
 	}
@@ -308,7 +298,7 @@ private:
 		// A, B, 1, 2: Same as A, 1, 2, B. 2 never waits because 1 does not
 		// find an empty container.
 		if (was_empty) {
-			if constexpr (detail::pop_frontable<Container> && adding_several) {
+			if constexpr (pop_frontable<Container> && adding_several) {
 				m_notify_addition.notify_all();
 			} else {
 				m_notify_addition.notify_one();
@@ -341,13 +331,11 @@ private:
 	std::condition_variable_any m_notify_addition;
 };
 
-}	// namespace detail
-
 // basic_unbounded_queue is limited only by the available memory on the system
-template<typename Container, typename Mutex = std::mutex>
-struct basic_unbounded_queue : private detail::basic_queue_impl<Container, Mutex, basic_unbounded_queue<Container, Mutex>> {
+export template<typename Container, typename Mutex = std::mutex>
+struct basic_unbounded_queue : private basic_queue_impl<Container, Mutex, basic_unbounded_queue<Container, Mutex>> {
 private:
-	using base = detail::basic_queue_impl<Container, Mutex, basic_unbounded_queue<Container, Mutex>>;
+	using base = basic_queue_impl<Container, Mutex, basic_unbounded_queue<Container, Mutex>>;
 public:
 	using typename base::container_type;
 	using typename base::value_type;
@@ -382,7 +370,7 @@ private:
 	}
 };
 
-template<typename T, typename Mutex = std::mutex>
+export template<typename T, typename Mutex = std::mutex>
 using unbounded_queue = basic_unbounded_queue<std::vector<T>, std::mutex>;
 
 
@@ -390,10 +378,10 @@ using unbounded_queue = basic_unbounded_queue<std::vector<T>, std::mutex>;
 // blocking_queue has a max_size. If the queue contains at least max_size()
 // elements when attempting to add data, the call will block until the size is
 // less than max_size().
-template<typename Container, typename Mutex = std::mutex>
-struct basic_blocking_queue : private detail::basic_queue_impl<Container, Mutex, basic_blocking_queue<Container, Mutex>> {
+export template<typename Container, typename Mutex = std::mutex>
+struct basic_blocking_queue : private basic_queue_impl<Container, Mutex, basic_blocking_queue<Container, Mutex>> {
 private:
-	using base = detail::basic_queue_impl<Container, Mutex, basic_blocking_queue<Container, Mutex>>;
+	using base = basic_queue_impl<Container, Mutex, basic_blocking_queue<Container, Mutex>>;
 public:
 	using typename base::container_type;
 	using typename base::value_type;
@@ -448,7 +436,7 @@ private:
 	std::condition_variable_any m_notify_removal;
 };
 
-template<typename T, typename Mutex = std::mutex>
+export template<typename T, typename Mutex = std::mutex>
 using blocking_queue = basic_blocking_queue<std::vector<T>, Mutex>;
 
 } // namespace concurrent

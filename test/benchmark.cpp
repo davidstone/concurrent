@@ -3,21 +3,9 @@
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-#include <concurrent/queue.hpp>
-
-#include <bounded/scope_guard.hpp>
-
-#include <containers/stable_vector.hpp>
-#include <containers/vector.hpp>
-
-#include <atomic>
-#include <cstddef>
-#include <cstdint>
+#include <compare>
+#include <chrono>
 #include <iostream>
-#include <numeric>
-#include <stdexcept>
-#include <string>
-#include <vector>
 
 #if defined NDEBUG
 	#define CONCURRENT_NDEBUG_WAS_DEFINED NDEBUG
@@ -25,6 +13,11 @@
 #endif
 
 #include <cassert>
+
+import bounded;
+import concurrent_queue;
+import containers;
+import std_module;
 
 // Like assert, but always evaluated
 #define CONCURRENT_TEST assert
@@ -34,6 +27,10 @@
 #endif
 
 namespace {
+
+using namespace bounded::literal;
+
+using thread_count = bounded::integer<1, 1'000'000>;
 
 auto now() {
 	return std::chrono::steady_clock::now();
@@ -52,42 +49,36 @@ void reserve([[maybe_unused]] C & c) {
 
 struct spin_mutex {
 	auto try_lock() -> bool {
-		return !m_flag.test_and_set(std::memory_order_acquire);
+		return !m_flag.test_and_set(std::memory_order::acquire);
 	}
 	auto lock() -> void {
 		while (!try_lock()) {
-			while (m_flag.test(std::memory_order_relaxed)) {
+			while (m_flag.test(std::memory_order::relaxed)) {
 			}
 		}
 	}
 	auto unlock() -> void {
-		m_flag.clear(std::memory_order_release);
+		m_flag.clear(std::memory_order::release);
 	}
 private:
-	std::atomic_flag m_flag = ATOMIC_FLAG_INIT;
+	std::atomic_flag m_flag;
 };
 
-void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers, std::size_t bulk_size) {
+void test_ordering(thread_count const number_of_readers, thread_count const number_of_writers, std::size_t bulk_size) {
 	std::atomic<std::uint64_t> largest_read(0);
 	std::atomic<std::uint64_t> items_read(0);
 	std::atomic<std::uint64_t> number_of_writes(0);
 	
 	using value_type = int;
-	auto const bulk_data_source = [=]{
-		auto result = std::vector<value_type>(bulk_size);
-			std::iota(result.begin(), result.end(), 0);
-			return result;
-		}();
-	value_type const * const bulk_data_begin = bulk_data_source.data();
-	value_type const * const bulk_data_end = bulk_data_source.data() + size(bulk_data_source);
+	auto const bulk_data_source = containers::vector<value_type>(containers::integer_range(bulk_size));
+	value_type const * const bulk_data_begin = containers::data(bulk_data_source);
+	value_type const * const bulk_data_end = bulk_data_begin + containers::size(bulk_data_source);
 	
-	auto create_threads = [](auto const count, auto const function) {
-		auto threads = std::vector<std::jthread>{};
-		threads.reserve(count);
-		for (std::size_t n = 0; n != count; ++n) {
-			threads.emplace_back(function);
-		}
-		return threads;
+	auto create_threads = [](thread_count const count, auto const function) {
+		return containers::dynamic_array<std::jthread>(containers::generate_n(
+			count,
+			[&] { return bounded::no_lazy_construction(std::jthread(function)); }
+		));
 	};
 	
 	auto update_atomic = [](auto & atomic, auto & local) { return bounded::scope_guard([&]{ atomic += local; }); };
@@ -165,27 +156,21 @@ void test_ordering(std::size_t number_of_readers, std::size_t number_of_writers,
 }
 
 struct parsed_args {
-	std::size_t readers;
-	std::size_t writers;
+	thread_count readers;
+	thread_count writers;
 	std::size_t batch_size;
 };
 
 auto parse_args(int const argc, char const * const * argv) {
 	if (argc == 1) {
-		return parsed_args{1, 1, 2000};
+		return parsed_args{1_bi, 1_bi, 2000};
 	}
 	if (argc != 4) {
 		throw std::runtime_error("Usage is queue readers writers batch-size");
 	}
-	auto const readers = std::stoull(argv[1]);
-	auto const writers = std::stoull(argv[2]);
+	auto const readers = bounded::check_in_range<thread_count>(std::stoull(argv[1]));
+	auto const writers = bounded::check_in_range<thread_count>(std::stoull(argv[2]));
 	auto const batch_size = std::stoull(argv[3]);
-	if (readers == 0) {
-		throw std::runtime_error("Must have at least one reader thread");
-	}
-	if (writers == 0) {
-		throw std::runtime_error("Must have at least one writer thread");
-	}
 	return parsed_args{readers, writers, batch_size};
 }
 
