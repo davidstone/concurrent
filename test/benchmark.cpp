@@ -36,7 +36,7 @@ auto now() {
 	return std::chrono::steady_clock::now();
 }
 
-constexpr auto reserved_size = 600'000'000;
+constexpr auto reserved_size = 600'000'000_bi;
 template<typename T>
 using Container = containers::stable_vector<T, reserved_size>;
 
@@ -120,7 +120,7 @@ void test_ordering(thread_count const number_of_readers, thread_count const numb
 				local_largest_read = std::max(local_largest_read, static_cast<std::size_t>(count));
 				local_items_read += static_cast<std::uint64_t>(count);
 				CONCURRENT_TEST(static_cast<std::size_t>(count) % bulk_size == 0);
-				for (auto it = begin(data); it != end(data); it += bounded::assume_in_range(bulk_size, 0_bi, bounded::constant<reserved_size>)) {
+				for (auto it = begin(data); it != end(data); it += bounded::assume_in_range(bulk_size, 0_bi, reserved_size)) {
 					CONCURRENT_TEST(containers::equal(bulk_data_begin, bulk_data_end, it));
 				}
 			};
