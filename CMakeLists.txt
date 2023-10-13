@@ -4,6 +4,7 @@
 # http://www.boost.org/LICENSE_1_0.txt)
 
 cmake_minimum_required(VERSION 3.27 FATAL_ERROR)
+cmake_policy(VERSION 3.27...3.28)
 
 project(concurrent_queue LANGUAGES CXX)
 
