@@ -25,6 +25,7 @@ if (NOT has_parent)
 	add_subdirectory(dependencies/Catch2 EXCLUDE_FROM_ALL)
 	add_subdirectory(dependencies/numeric-traits)
 	add_subdirectory(dependencies/operators)
+	add_subdirectory(dependencies/std_module)
 
 	set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable testing benchmark.")
 	add_subdirectory(dependencies/benchmark EXCLUDE_FROM_ALL)
@@ -40,9 +41,10 @@ add_library(concurrent_queue STATIC)
 
 target_link_libraries(concurrent_queue
 	PUBLIC
-		strict_defaults_interface
 		bounded
 		containers
+		std_module
+		strict_defaults_interface
 	PRIVATE
 		strict_defaults
 )
@@ -64,9 +66,10 @@ add_executable(concurrent_queue_test
 	test/queue.cpp
 )
 target_link_libraries(concurrent_queue_test
-	concurrent_queue
-	strict_defaults
 	Catch2::Catch2WithMain
+	concurrent_queue
+	std_module
+	strict_defaults
 )
 add_test(concurrent_queue_test concurrent_queue_test)
 
@@ -76,5 +79,6 @@ add_executable(concurrent_queue_benchmark
 target_link_libraries(concurrent_queue_benchmark
 	benchmark
 	concurrent_queue
+	std_module
 	strict_defaults
 )
