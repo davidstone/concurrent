@@ -4,8 +4,6 @@
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #include <std_module/prelude.hpp>
-#include <chrono>
-#include <iostream>
 
 #if defined NDEBUG
 	#define CONCURRENT_NDEBUG_WAS_DEFINED NDEBUG
