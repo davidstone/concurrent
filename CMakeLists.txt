@@ -6,7 +6,7 @@
 cmake_minimum_required(VERSION 3.27 FATAL_ERROR)
 cmake_policy(VERSION 3.27...3.28)
 
-project(concurrent_queue LANGUAGES CXX)
+project(concurrent LANGUAGES CXX)
 
 enable_testing()
 
@@ -37,9 +37,9 @@ if (NOT has_parent)
 	endif()
 endif()	
 
-add_library(concurrent_queue STATIC)
+add_library(concurrent STATIC)
 
-target_link_libraries(concurrent_queue
+target_link_libraries(concurrent
 	PUBLIC
 		bounded
 		containers
@@ -49,36 +49,37 @@ target_link_libraries(concurrent_queue
 		strict_defaults
 )
 
-target_sources(concurrent_queue PUBLIC
+target_sources(concurrent PUBLIC
 	FILE_SET CXX_MODULES
 	BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
 	FILES
+		source/concurrent.cpp
 		source/queue.cpp
 )
 
 if(NOT WINDOWS)
-	target_link_libraries(concurrent_queue INTERFACE
+	target_link_libraries(concurrent INTERFACE
 		pthread
 	)
 endif()
 
-add_executable(concurrent_queue_test
+add_executable(concurrent_test
 	test/queue.cpp
 )
-target_link_libraries(concurrent_queue_test
+target_link_libraries(concurrent_test
 	Catch2::Catch2WithMain
-	concurrent_queue
+	concurrent
 	std_module
 	strict_defaults
 )
-add_test(concurrent_queue_test concurrent_queue_test)
+add_test(concurrent_test concurrent_test)
 
 add_executable(concurrent_queue_benchmark
 	test/benchmark.cpp
 )
 target_link_libraries(concurrent_queue_benchmark
 	benchmark
-	concurrent_queue
+	concurrent
 	std_module
 	strict_defaults
 )

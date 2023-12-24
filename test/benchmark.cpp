@@ -13,7 +13,7 @@
 #include <cassert>
 
 import bounded;
-import concurrent_queue;
+import concurrent;
 import containers;
 import std_module;
 

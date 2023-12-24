@@ -6,7 +6,7 @@
 #include <std_module/prelude.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-import concurrent_queue;
+import concurrent.queue;
 import containers;
 import std_module;
 

@@ -19,7 +19,7 @@ This is a sample program that has two producer threads that are generating the n
 ```
 #include <thread>
 
-import concurrent_queue;
+import concurrent;
 
 struct producer_t {
 	explicit producer_t(concurrent::unbounded_queue<int> & queue):

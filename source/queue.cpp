@@ -11,7 +11,7 @@ module;
 
 #include <operators/forward.hpp>
 
-export module concurrent_queue;
+export module concurrent.queue;
 
 import containers;
 import tv;
