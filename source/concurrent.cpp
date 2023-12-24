@@ -5,4 +5,5 @@
 
 export module concurrent;
 
+export import concurrent.locked_access;
 export import concurrent.queue;

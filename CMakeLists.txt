@@ -54,6 +54,7 @@ target_sources(concurrent PUBLIC
 	BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
 	FILES
 		source/concurrent.cpp
+		source/locked_access.cpp
 		source/queue.cpp
 )
 
