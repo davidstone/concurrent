@@ -36,18 +36,26 @@ struct basic_queue_impl {
 	// reserve all the space it needs.
 	auto append(containers::range auto && input) -> void {
 		constexpr auto adding_several = std::true_type{};
-		generic_add(adding_several, [&]{ containers::append(m_container, OPERATORS_FORWARD(input)); });
+		generic_add(
+			adding_several,
+			[&]{ containers::append(m_container, OPERATORS_FORWARD(input)); }
+		);
 	}
 
 	auto non_blocking_append(containers::range auto && input) -> bool {
 		constexpr auto adding_several = std::true_type{};
-		return generic_non_blocking_add(adding_several, [&]{ containers::append(m_container, OPERATORS_FORWARD(input)); });
+		return generic_non_blocking_add(
+			adding_several,
+			[&]{ containers::append(m_container, OPERATORS_FORWARD(input)); }
+		);
 	}
 
-	template<typename... Args>
-	auto emplace(Args && ... args) -> void {
+	auto emplace(auto && ... args) -> void {
 		constexpr auto adding_several = std::false_type{};
-		generic_add(adding_several, [&]{ containers::emplace_back(m_container, OPERATORS_FORWARD(args)...); });
+		generic_add(
+			adding_several,
+			[&]{ containers::emplace_back(m_container, OPERATORS_FORWARD(args)...); }
+		);
 	}
 	auto push(value_type && value) -> void {
 		emplace(std::move(value));
@@ -56,10 +64,12 @@ struct basic_queue_impl {
 		emplace(value);
 	}
 
-	template<typename... Args>
-	auto non_blocking_emplace(Args && ... args) -> bool {
+	auto non_blocking_emplace(auto && ... args) -> bool {
 		constexpr auto adding_several = std::false_type{};
-		return generic_non_blocking_add(adding_several, [&]{ containers::emplace_back(m_container, OPERATORS_FORWARD(args)...); });
+		return generic_non_blocking_add(
+			adding_several,
+			[&]{ containers::emplace_back(m_container, OPERATORS_FORWARD(args)...); }
+		);
 	}
 	auto non_blocking_push(value_type && value) -> bool {
 		return non_blocking_emplace(std::move(value));
@@ -185,8 +195,7 @@ struct basic_queue_impl {
 	}
 
 
-	template<typename Capacity>
-	auto reserve(Capacity const new_capacity) -> void {
+	auto reserve(auto const new_capacity) -> void {
 		auto lock = lock_type(m_mutex);
 		m_container.reserve(new_capacity);
 	}
@@ -243,13 +252,11 @@ private:
 	}
 
 
-	template<typename Bool, typename Function>
-	auto generic_add(Bool const adding_several, Function && add) -> void {
+	auto generic_add(auto const adding_several, auto && add) -> void {
 		generic_add_impl(adding_several, lock_type(m_mutex), add);
 	}
 
-	template<typename Bool, typename Function>
-	auto generic_non_blocking_add(Bool const adding_several, Function && add) -> bool {
+	auto generic_non_blocking_add(auto const adding_several, auto && add) -> bool {
 		auto lock = lock_type(m_mutex, std::try_to_lock);
 		if (!lock.owns_lock()) {
 			return false;
@@ -258,8 +265,7 @@ private:
 		return true;
 	}
 
-	template<typename Bool, typename Function>
-	auto generic_add_impl(Bool const adding_several, lock_type lock, Function && add) -> void {
+	auto generic_add_impl(auto const adding_several, lock_type lock, auto && add) -> void {
 		derived().handle_add(m_container, lock);
 		auto const was_empty = containers::is_empty(m_container);
 		add();
@@ -416,10 +422,17 @@ private:
 	friend base;
 
 	auto handle_add(Container & queue, std::unique_lock<Mutex> & lock) -> void {
-		m_notify_removal.wait(lock, [&]{ return containers::size(queue) < m_max_size; });
+		m_notify_removal.wait(
+			lock,
+			[&]{ return containers::size(queue) < m_max_size; }
+		);
 	}
 	auto handle_add(Container & queue, std::stop_token token, std::unique_lock<Mutex> & lock) -> void {
-		m_notify_removal.wait(lock, std::move(token), [&]{ return containers::size(queue) < m_max_size; });
+		m_notify_removal.wait(
+			lock,
+			std::move(token),
+			[&]{ return containers::size(queue) < m_max_size; }
+		);
 	}
 	auto handle_remove_all(containers::range_size_t<Container> const previous_size) -> void {
 		if (previous_size >= max_size()) {
