@@ -35,25 +35,19 @@ struct basic_queue_impl {
 	// This will also optimize memory usage, as the underlying container can
 	// reserve all the space it needs.
 	auto append(containers::range auto && input) -> void {
-		constexpr auto adding_several = std::true_type{};
 		generic_add(
-			adding_several,
 			[&]{ containers::append(m_container, OPERATORS_FORWARD(input)); }
 		);
 	}
 
 	auto non_blocking_append(containers::range auto && input) -> bool {
-		constexpr auto adding_several = std::true_type{};
 		return generic_non_blocking_add(
-			adding_several,
 			[&]{ containers::append(m_container, OPERATORS_FORWARD(input)); }
 		);
 	}
 
 	auto emplace(auto && ... args) -> void {
-		constexpr auto adding_several = std::false_type{};
 		generic_add(
-			adding_several,
 			[&]{ containers::emplace_back(m_container, OPERATORS_FORWARD(args)...); }
 		);
 	}
@@ -65,9 +59,7 @@ struct basic_queue_impl {
 	}
 
 	auto non_blocking_emplace(auto && ... args) -> bool {
-		constexpr auto adding_several = std::false_type{};
 		return generic_non_blocking_add(
-			adding_several,
 			[&]{ containers::emplace_back(m_container, OPERATORS_FORWARD(args)...); }
 		);
 	}
@@ -252,20 +244,20 @@ private:
 	}
 
 
-	auto generic_add(auto const adding_several, auto && add) -> void {
-		generic_add_impl(adding_several, lock_type(m_mutex), add);
+	auto generic_add(auto && add) -> void {
+		generic_add_impl(lock_type(m_mutex), add);
 	}
 
-	auto generic_non_blocking_add(auto const adding_several, auto && add) -> bool {
+	auto generic_non_blocking_add(auto && add) -> bool {
 		auto lock = lock_type(m_mutex, std::try_to_lock);
 		if (!lock.owns_lock()) {
 			return false;
 		}
-		generic_add_impl(adding_several, std::move(lock), add);
+		generic_add_impl(std::move(lock), add);
 		return true;
 	}
 
-	auto generic_add_impl(auto const adding_several, lock_type lock, auto && add) -> void {
+	auto generic_add_impl(lock_type lock, auto && add) -> void {
 		derived().handle_add(m_container, lock);
 		auto const was_empty = containers::is_empty(m_container);
 		add();
@@ -304,7 +296,7 @@ private:
 		// A, B, 1, 2: Same as A, 1, 2, B. 2 never waits because 1 does not
 		// find an empty container.
 		if (was_empty) {
-			if constexpr (pop_frontable<Container> && adding_several) {
+			if constexpr (pop_frontable<Container>) {
 				m_notify_addition.notify_all();
 			} else {
 				m_notify_addition.notify_one();
