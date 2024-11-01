@@ -115,7 +115,7 @@ struct consumer_t {
 		thread([&](std::stop_token token) {
 			auto buffer = concurrent::unbounded_queue<int>::container_type();
 			while (!token.stop_requested()) {
-				buffer = queue.pop_all(std::move(buffer));
+				buffer = queue.pop_all(token, std::move(buffer));
 				for (int const value : buffer) {
 					std::cout << value << ' ';
 				}
