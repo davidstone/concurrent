@@ -51,11 +51,23 @@ struct basic_queue_impl {
 			[&]{ containers::emplace_back(m_container, OPERATORS_FORWARD(args)...); }
 		);
 	}
+	auto stoppable_emplace(std::stop_token token, auto && ... args) -> bool {
+		return generic_add(
+			std::move(token),
+			[&]{ containers::emplace_back(m_container, OPERATORS_FORWARD(args)...); }
+		);
+	}
 	auto push(value_type && value) -> void {
 		emplace(std::move(value));
 	}
 	auto push(value_type const & value) -> void {
 		emplace(value);
+	}
+	auto push(std::stop_token token, value_type && value) -> bool {
+		return stoppable_emplace(std::move(token), std::move(value));
+	}
+	auto push(std::stop_token token, value_type const & value) -> bool {
+		return stoppable_emplace(std::move(token), value);
 	}
 
 	auto non_blocking_emplace(auto && ... args) -> bool {
@@ -249,6 +261,14 @@ private:
 		derived().handle_add(m_container, lock);
 		generic_add_impl(std::move(lock), add);
 	}
+	auto generic_add(std::stop_token token, auto const add) -> bool {
+		auto lock = lock_type(m_mutex);
+		auto const should_add = derived().handle_add(m_container, std::move(token), lock);
+		if (should_add) {
+			generic_add_impl(std::move(lock), add);
+		}
+		return should_add;
+	}
 
 	auto generic_non_blocking_add(auto const add) -> bool {
 		auto lock = lock_type(m_mutex, std::try_to_lock);
@@ -366,6 +386,9 @@ private:
 
 	auto handle_add(Container &, std::unique_lock<Mutex> &) -> void {
 	}
+	auto handle_add(Container &, std::stop_token const &, std::unique_lock<Mutex> &) -> bool {
+		return true;
+	}
 	auto handle_non_blocking_add(Container &, std::unique_lock<Mutex> &) -> bool {
 		return true;
 	}
@@ -403,6 +426,7 @@ public:
 	using base::append;
 	using base::non_blocking_append;
 	using base::emplace;
+	using base::stoppable_emplace;
 	using base::non_blocking_emplace;
 	using base::push;
 	using base::non_blocking_push;
@@ -426,8 +450,8 @@ private:
 			[&]{ return containers::size(queue) < m_max_size; }
 		);
 	}
-	auto handle_add(Container & queue, std::stop_token token, std::unique_lock<Mutex> & lock) -> void {
-		m_notify_removal.wait(
+	auto handle_add(Container & queue, std::stop_token token, std::unique_lock<Mutex> & lock) -> bool {
+		return m_notify_removal.wait(
 			lock,
 			std::move(token),
 			[&]{ return containers::size(queue) < m_max_size; }

@@ -180,4 +180,18 @@ TEST_CASE("non_blocking_push never blocks", "concurrent_queue") {
 	CHECK(!added);
 }
 
+TEST_CASE("push unblocks when stop requested", "concurrent_queue") {
+	auto queue = concurrent::blocking_queue<int>(0);
+	auto source = std::stop_source();
+	auto const time_to_wake_up = now() + duration;
+	auto thread = std::jthread([&]{
+		std::this_thread::sleep_until(time_to_wake_up);
+		source.request_stop();
+	});
+	auto const added = queue.push(source.get_token(), 6);
+	CHECK(now() >= time_to_wake_up);
+	CHECK(!added);
+	CHECK(queue.size() == 0);
+}
+
 } // namespace
