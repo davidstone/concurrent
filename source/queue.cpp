@@ -244,21 +244,25 @@ private:
 	}
 
 
-	auto generic_add(auto && add) -> void {
-		generic_add_impl(lock_type(m_mutex), add);
+	auto generic_add(auto const add) -> void {
+		auto lock = lock_type(m_mutex);
+		derived().handle_add(m_container, lock);
+		generic_add_impl(std::move(lock), add);
 	}
 
-	auto generic_non_blocking_add(auto && add) -> bool {
+	auto generic_non_blocking_add(auto const add) -> bool {
 		auto lock = lock_type(m_mutex, std::try_to_lock);
 		if (!lock.owns_lock()) {
+			return false;
+		}
+		if (!derived().handle_non_blocking_add(m_container, lock)) {
 			return false;
 		}
 		generic_add_impl(std::move(lock), add);
 		return true;
 	}
 
-	auto generic_add_impl(lock_type lock, auto && add) -> void {
-		derived().handle_add(m_container, lock);
+	auto generic_add_impl(lock_type lock, auto const add) -> void {
 		auto const was_empty = containers::is_empty(m_container);
 		add();
 		lock.unlock();
@@ -362,6 +366,9 @@ private:
 
 	auto handle_add(Container &, std::unique_lock<Mutex> &) -> void {
 	}
+	auto handle_non_blocking_add(Container &, std::unique_lock<Mutex> &) -> bool {
+		return true;
+	}
 	auto handle_remove_all(containers::range_size_t<Container>) -> void {
 	}
 	auto handle_remove_one(containers::range_size_t<Container>) -> void {
@@ -425,6 +432,9 @@ private:
 			std::move(token),
 			[&]{ return containers::size(queue) < m_max_size; }
 		);
+	}
+	auto handle_non_blocking_add(Container & queue, std::unique_lock<Mutex> &) -> bool {
+		return containers::size(queue) < m_max_size;
 	}
 	auto handle_remove_all(containers::range_size_t<Container> const previous_size) -> void {
 		if (previous_size >= max_size()) {

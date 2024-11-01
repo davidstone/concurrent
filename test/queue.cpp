@@ -174,4 +174,10 @@ TEST_CASE("blocking", "concurrent_queue") {
 	CHECK(result.front() == value);
 }
 
+TEST_CASE("non_blocking_push never blocks", "concurrent_queue") {
+	auto queue = concurrent::blocking_queue<int>(0);
+	auto const added = queue.non_blocking_push(6);
+	CHECK(!added);
+}
+
 } // namespace
