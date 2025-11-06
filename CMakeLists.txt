@@ -18,6 +18,11 @@ if (NOT has_parent)
 	add_subdirectory(dependencies/cmake_strict_defaults)
 	add_subdirectory(dependencies/bounded)
 	add_subdirectory(dependencies/Catch2 EXCLUDE_FROM_ALL)
+	if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+		target_compile_options(Catch2 PUBLIC
+			"-Wno-c2y-extensions"
+		)
+	endif()
 	add_subdirectory(dependencies/numeric-traits)
 	add_subdirectory(dependencies/operators)
 	add_subdirectory(dependencies/std_module)
@@ -29,6 +34,7 @@ if (NOT has_parent)
 	if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 		target_compile_options(benchmark PUBLIC
 			"-Wno-global-constructors"
+			"-Wno-c2y-extensions"
 		)
 	endif()
 endif()	
