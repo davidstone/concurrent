@@ -66,7 +66,7 @@ void test_ordering(thread_count const number_of_readers, thread_count const numb
 	std::atomic<std::uint64_t> number_of_writes(0);
 	
 	using value_type = int;
-	auto const bulk_data_source = containers::vector<value_type>(containers::integer_range(static_cast<int>(bulk_size)));
+	auto const bulk_data_source = containers::dynamic_array<value_type>(containers::integer_range(static_cast<int>(bulk_size)));
 	value_type const * const bulk_data_begin = containers::data(bulk_data_source);
 	value_type const * const bulk_data_end = bulk_data_begin + containers::size(bulk_data_source);
 	
