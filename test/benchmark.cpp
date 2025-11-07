@@ -67,8 +67,6 @@ void test_ordering(thread_count const number_of_readers, thread_count const numb
 	
 	using value_type = int;
 	auto const bulk_data_source = containers::dynamic_array<value_type>(containers::integer_range(static_cast<int>(bulk_size)));
-	value_type const * const bulk_data_begin = containers::data(bulk_data_source);
-	value_type const * const bulk_data_end = bulk_data_begin + containers::size(bulk_data_source);
 	
 	auto create_threads = [](thread_count const count, auto const function) {
 		return containers::dynamic_array<std::jthread>(containers::generate_n(
@@ -116,8 +114,12 @@ void test_ordering(thread_count const number_of_readers, thread_count const numb
 				local_largest_read = std::max(local_largest_read, static_cast<std::size_t>(count));
 				local_items_read += static_cast<std::uint64_t>(count);
 				CONCURRENT_TEST(static_cast<std::size_t>(count) % bulk_size == 0);
-				for (auto it = begin(data); it != end(data); it += bounded::assume_in_range(bulk_size, 0_bi, reserved_size)) {
-					CONCURRENT_TEST(containers::equal(bulk_data_begin, bulk_data_end, it));
+				auto const range_size = bounded::assume_in_range(bulk_size, 0_bi, reserved_size);
+				for (auto it = begin(data); it != end(data); it += range_size) {
+					CONCURRENT_TEST(containers::equal_assume_same_size(
+						bulk_data_source,
+						containers::subrange(it, range_size)
+					));
 				}
 			};
 			while (!token.stop_requested()) {
