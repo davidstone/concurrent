@@ -340,7 +340,4 @@ Returns the maximum size of the queue.
 
 # Supported Compilers
 
-This library requires C++20 support. The specific features used require one of the following (or newer)
-
-* clang 13.0.1
-* gcc 12.1.0
+This library requires compiling with clang 22 or newer.
