@@ -15,14 +15,9 @@ if (NOT has_parent)
 	set(CMAKE_CXX_STANDARD_REQUIRED On)
 	set(CMAKE_CXX_EXTENSIONS Off)
 
-	add_subdirectory(dependencies/cmake_strict_defaults)
 	add_subdirectory(dependencies/bounded)
-	add_subdirectory(dependencies/Catch2 EXCLUDE_FROM_ALL)
-	if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-		target_compile_options(Catch2 PUBLIC
-			"-Wno-c2y-extensions"
-		)
-	endif()
+	add_subdirectory(dependencies/cmake_strict_defaults)
+	add_subdirectory(dependencies/doctest)
 	add_subdirectory(dependencies/numeric-traits)
 	add_subdirectory(dependencies/operators)
 	add_subdirectory(dependencies/std_module)
@@ -70,8 +65,8 @@ add_executable(concurrent_test
 	test/queue.cpp
 )
 target_link_libraries(concurrent_test
-	Catch2::Catch2WithMain
 	concurrent
+	doctest::doctest_with_main
 	strict_defaults
 )
 add_test(concurrent_test concurrent_test)

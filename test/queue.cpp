@@ -3,7 +3,7 @@
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-#include <catch2/catch_test_macros.hpp>
+#include <doctest/doctest.h>
 
 import concurrent.queue;
 import containers;
@@ -11,21 +11,21 @@ import std_module;
 
 namespace {
 
-TEST_CASE("int", "concurrent_queue") {
+TEST_CASE("concurrent_queue: int") {
 	auto queue = concurrent::unbounded_queue<int>{};
 	queue.emplace(0);
 	queue.push(7);
 	auto const first_values = queue.pop_all();
-	CHECK(size(first_values) == 2);
+	CHECK(containers::size(first_values) == 2);
 	CHECK(first_values[0] == 0);
 	CHECK(first_values[1] == 7);
 	queue.push(4);
 	auto const second_values = queue.pop_all();
-	CHECK(size(second_values) == 1);
+	CHECK(containers::size(second_values) == 1);
 }
 
 // Tests ranges and conversions
-TEST_CASE("string", "concurrent_queue") {
+TEST_CASE("concurrent_queue: string") {
 	auto queue = concurrent::unbounded_queue<std::string>{};
 	queue.emplace("Reese");
 	queue.push("Finch");
@@ -88,7 +88,7 @@ private:
 	static inline std::size_t s_move_assigned = 0;
 };
 
-TEST_CASE("copy move", "concurrent_queue") {
+TEST_CASE("concurrent_queue: copy move") {
 	// Some of these tests will fail if the standard library implementation
 	// makes unnecessary copies / moves.
 	auto queue = concurrent::unbounded_queue<copy_move_counter>{};
@@ -113,18 +113,18 @@ TEST_CASE("copy move", "concurrent_queue") {
 	check_all();
 	
 	auto array = std::array<copy_move_counter, 3>{};
-	expected_default_constructed += size(array);
+	expected_default_constructed += containers::size(array);
 	check_all();
 
 	queue.append(array);
-	expected_copy_constructed += size(array);
+	expected_copy_constructed += containers::size(array);
 	check_all();
 	
 	queue.pop_all();
 	check_all();
 
 	queue.append(std::move(array));
-	expected_move_constructed += size(array);
+	expected_move_constructed += containers::size(array);
 	check_all();
 }
 
@@ -135,7 +135,7 @@ auto now() {
 }
 constexpr auto duration = std::chrono::milliseconds(100);
 
-TEST_CASE("timeout", "concurrent_queue") {
+TEST_CASE("concurrent_queue: timeout") {
 	auto queue = concurrent::unbounded_queue<int>{};
 	auto const before_time_point = now();
 	auto const values_time_point = queue.pop_all(before_time_point + duration);
@@ -146,20 +146,20 @@ TEST_CASE("timeout", "concurrent_queue") {
 	CHECK(after_time_point - before_time_point >= duration);
 	CHECK(after_duration - after_time_point >= duration);
 
-	CHECK(empty(values_time_point));
-	CHECK(empty(values_duration));
+	CHECK(containers::is_empty(values_time_point));
+	CHECK(containers::is_empty(values_duration));
 	
 	queue.push(0);
 	auto const should_be_fast = queue.pop_all(std::chrono::hours(24 * 365));
-	CHECK(size(should_be_fast) == 1);
+	CHECK(containers::size(should_be_fast) == 1);
 	CHECK(should_be_fast[0] == 0);
 	
 	auto const immediate = queue.try_pop_all();
-	CHECK(empty(immediate));
+	CHECK(containers::is_empty(immediate));
 }
 
 
-TEST_CASE("blocking", "concurrent_queue") {
+TEST_CASE("concurrent_queue: blocking") {
 	auto queue = concurrent::unbounded_queue<int>{};
 	auto const value = 6;
 	auto const time_to_wake_up = now() + duration;
@@ -169,17 +169,17 @@ TEST_CASE("blocking", "concurrent_queue") {
 	});
 	auto const result = queue.pop_all();
 	CHECK(now() >= time_to_wake_up);
-	CHECK(size(result) == 1);
+	CHECK(containers::size(result) == 1);
 	CHECK(result.front() == value);
 }
 
-TEST_CASE("non_blocking_push never blocks", "concurrent_queue") {
+TEST_CASE("concurrent_queue: non_blocking_push never blocks") {
 	auto queue = concurrent::blocking_queue<int>(0);
 	auto const added = queue.non_blocking_push(6);
 	CHECK(!added);
 }
 
-TEST_CASE("push unblocks when stop requested", "concurrent_queue") {
+TEST_CASE("concurrent_queue: push unblocks when stop requested") {
 	auto queue = concurrent::blocking_queue<int>(0);
 	auto source = std::stop_source();
 	auto const time_to_wake_up = now() + duration;
