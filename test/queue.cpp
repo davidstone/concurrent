@@ -29,7 +29,7 @@ TEST_CASE("concurrent_queue: string") {
 	auto queue = concurrent::unbounded_queue<std::string>{};
 	queue.emplace("Reese");
 	queue.push("Finch");
-	char const * array[] = {
+	constexpr auto array = std::array<char const *, 2>{
 		"Carter", "Fusco"
 	};
 	queue.append(array);
