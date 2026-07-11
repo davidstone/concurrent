@@ -41,7 +41,6 @@ target_link_libraries(concurrent
 		bounded
 		containers
 		std_module
-		strict_defaults_interface
 	PRIVATE
 		strict_defaults
 )
