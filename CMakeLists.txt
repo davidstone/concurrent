@@ -52,6 +52,7 @@ target_sources(concurrent PUBLIC
 		source/concurrent.cpp
 		source/locked_access.cpp
 		source/queue.cpp
+		source/queue_stack_impl.cpp
 )
 
 if(NOT WINDOWS)
