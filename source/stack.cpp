@@ -1,17 +1,15 @@
-// Copyright IHS Markit Ltd 2017.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-// This contains a thread-safe queue that can be used in a multi-producer,
-// multi-consumer context. It is optimized for a single consumer, as the entire
-// queue is drained whenever you request more data.
+// This contains a thread-safe stack that can be used in a multi-producer,
+// multi-consumer context.
 
 module;
 
 #include <operators/forward.hpp>
 
-export module concurrent.queue;
+export module concurrent.stack;
 
 import concurrent.queue_stack_impl;
 
@@ -22,18 +20,18 @@ import std_module;
 namespace concurrent {
 
 template<typename Container, typename Mutex>
-using queue_base = queue_stack_impl<Container, Mutex, sequence_type::queue>;
+using stack_base = queue_stack_impl<Container, Mutex, sequence_type::stack>;
 
-// basic_unbounded_queue is limited only by the available memory on the system
+// basic_unbounded_stack is limited only by the available memory on the system
 export template<typename Container, typename Mutex = std::mutex>
-struct basic_unbounded_queue : private queue_base<Container, Mutex> {
+struct basic_unbounded_stack : private stack_base<Container, Mutex> {
 private:
-	using base = queue_base<Container, Mutex>;
+	using base = stack_base<Container, Mutex>;
 public:
 	using typename base::container_type;
 	using typename base::value_type;
 
-	basic_unbounded_queue() = default;
+	basic_unbounded_stack() = default;
 
 	using base::append;
 	using base::non_blocking_append;
@@ -70,22 +68,22 @@ private:
 };
 
 export template<typename T, typename Mutex = std::mutex>
-using unbounded_queue = basic_unbounded_queue<std::vector<T>, std::mutex>;
+using unbounded_stack = basic_unbounded_stack<std::vector<T>, std::mutex>;
 
 
 
-// blocking_queue has a max_size. If the queue contains at least max_size()
+// blocking_stack has a max_size. If the stack contains at least max_size()
 // elements when attempting to add data, the call will block until the size is
 // less than max_size().
 export template<typename Container, typename Mutex = std::mutex>
-struct basic_blocking_queue : private queue_base<Container, Mutex> {
+struct basic_blocking_stack : private stack_base<Container, Mutex> {
 private:
-	using base = queue_base<Container, Mutex>;
+	using base = stack_base<Container, Mutex>;
 public:
 	using typename base::container_type;
 	using typename base::value_type;
 
-	explicit basic_blocking_queue(containers::range_size_t<Container> const max_size_):
+	explicit basic_blocking_stack(containers::range_size_t<Container> const max_size_):
 		m_max_size(max_size_)
 	{
 	}
@@ -115,21 +113,21 @@ public:
 private:
 	friend base;
 
-	auto handle_add(Container & queue, std::unique_lock<Mutex> & lock) -> void {
+	auto handle_add(Container & stack, std::unique_lock<Mutex> & lock) -> void {
 		m_notify_removal.wait(
 			lock,
-			[&]{ return containers::size(queue) < m_max_size; }
+			[&]{ return containers::size(stack) < m_max_size; }
 		);
 	}
-	auto handle_add(Container & queue, std::stop_token token, std::unique_lock<Mutex> & lock) -> bool {
+	auto handle_add(Container & stack, std::stop_token token, std::unique_lock<Mutex> & lock) -> bool {
 		return m_notify_removal.wait(
 			lock,
 			std::move(token),
-			[&]{ return containers::size(queue) < m_max_size; }
+			[&]{ return containers::size(stack) < m_max_size; }
 		);
 	}
-	auto handle_non_blocking_add(Container & queue, std::unique_lock<Mutex> &) -> bool {
-		return containers::size(queue) < m_max_size;
+	auto handle_non_blocking_add(Container & stack, std::unique_lock<Mutex> &) -> bool {
+		return containers::size(stack) < m_max_size;
 	}
 	auto handle_remove_all(containers::range_size_t<Container> const previous_size) -> void {
 		if (previous_size >= max_size()) {
@@ -147,6 +145,6 @@ private:
 };
 
 export template<typename T, typename Mutex = std::mutex>
-using blocking_queue = basic_blocking_queue<std::vector<T>, Mutex>;
+using blocking_stack = basic_blocking_stack<std::vector<T>, Mutex>;
 
 } // namespace concurrent

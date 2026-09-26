@@ -5,35 +5,35 @@
 
 #include <doctest/doctest.h>
 
-import concurrent.queue;
+import concurrent.stack;
 import containers;
 import std_module;
 
 namespace {
 
-TEST_CASE("concurrent_queue: int") {
-	auto queue = concurrent::unbounded_queue<int>{};
-	queue.emplace(0);
-	queue.push(7);
-	auto const first_values = queue.pop_all();
+TEST_CASE("concurrent_stack: int") {
+	auto stack = concurrent::unbounded_stack<int>{};
+	stack.emplace(0);
+	stack.push(7);
+	auto const first_values = stack.pop_all();
 	CHECK(containers::size(first_values) == 2);
 	CHECK(first_values[0] == 0);
 	CHECK(first_values[1] == 7);
-	queue.push(4);
-	auto const second_values = queue.pop_all();
+	stack.push(4);
+	auto const second_values = stack.pop_all();
 	CHECK(containers::size(second_values) == 1);
 }
 
 // Tests ranges and conversions
-TEST_CASE("concurrent_queue: string") {
-	auto queue = concurrent::unbounded_queue<std::string>{};
-	queue.emplace("Reese");
-	queue.push("Finch");
+TEST_CASE("concurrent_stack: string") {
+	auto stack = concurrent::unbounded_stack<std::string>{};
+	stack.emplace("Reese");
+	stack.push("Finch");
 	constexpr auto array = std::array<char const *, 2>{
 		"Carter", "Fusco"
 	};
-	queue.append(array);
-	auto const values = queue.pop_all();
+	stack.append(array);
+	auto const values = stack.pop_all();
 	auto const expected = std::array<char const *, 4>{
 		"Reese", "Finch", "Carter", "Fusco"
 	};
@@ -88,10 +88,10 @@ private:
 	static inline std::size_t s_move_assigned = 0;
 };
 
-TEST_CASE("concurrent_queue: copy move") {
+TEST_CASE("concurrent_stack: copy move") {
 	// Some of these tests will fail if the standard library implementation
 	// makes unnecessary copies / moves.
-	auto queue = concurrent::unbounded_queue<copy_move_counter>{};
+	auto stack = concurrent::unbounded_stack<copy_move_counter>{};
 	auto expected_default_constructed = static_cast<std::size_t>(0);
 	auto expected_copy_constructed = static_cast<std::size_t>(0);
 	auto expected_move_constructed = static_cast<std::size_t>(0);
@@ -105,25 +105,25 @@ TEST_CASE("concurrent_queue: copy move") {
 
 	check_all();
 
-	queue.emplace();
+	stack.emplace();
 	++expected_default_constructed;
 	check_all();
 	
-	queue.pop_all();
+	stack.pop_all();
 	check_all();
 	
 	auto array = std::array<copy_move_counter, 3>{};
 	expected_default_constructed += containers::size(array);
 	check_all();
 
-	queue.append(array);
+	stack.append(array);
 	expected_copy_constructed += containers::size(array);
 	check_all();
 	
-	queue.pop_all();
+	stack.pop_all();
 	check_all();
 
-	queue.append(std::move(array));
+	stack.append(std::move(array));
 	expected_move_constructed += containers::size(array);
 	check_all();
 }
@@ -135,12 +135,12 @@ auto now() {
 }
 constexpr auto duration = std::chrono::milliseconds(100);
 
-TEST_CASE("concurrent_queue: timeout") {
-	auto queue = concurrent::unbounded_queue<int>{};
+TEST_CASE("concurrent_stack: timeout") {
+	auto stack = concurrent::unbounded_stack<int>{};
 	auto const before_time_point = now();
-	auto const values_time_point = queue.pop_all(before_time_point + duration);
+	auto const values_time_point = stack.pop_all(before_time_point + duration);
 	auto const after_time_point = now();
-	auto const values_duration = queue.pop_all(duration);
+	auto const values_duration = stack.pop_all(duration);
 	auto const after_duration = now();
 
 	CHECK(after_time_point - before_time_point >= duration);
@@ -149,57 +149,57 @@ TEST_CASE("concurrent_queue: timeout") {
 	CHECK(containers::is_empty(values_time_point));
 	CHECK(containers::is_empty(values_duration));
 	
-	queue.push(0);
-	auto const should_be_fast = queue.pop_all(std::chrono::hours(24 * 365));
+	stack.push(0);
+	auto const should_be_fast = stack.pop_all(std::chrono::hours(24 * 365));
 	CHECK(containers::size(should_be_fast) == 1);
 	CHECK(should_be_fast[0] == 0);
 	
-	auto const immediate = queue.try_pop_all();
+	auto const immediate = stack.try_pop_all();
 	CHECK(containers::is_empty(immediate));
 }
 
 
-TEST_CASE("concurrent_queue: blocking") {
-	auto queue = concurrent::unbounded_queue<int>{};
+TEST_CASE("concurrent_stack: blocking") {
+	auto stack = concurrent::unbounded_stack<int>{};
 	auto const value = 6;
 	auto const time_to_wake_up = now() + duration;
 	auto thread = std::jthread([&]{
 		std::this_thread::sleep_until(time_to_wake_up);
-		queue.emplace(value);
+		stack.emplace(value);
 	});
-	auto const result = queue.pop_all();
+	auto const result = stack.pop_all();
 	CHECK(now() >= time_to_wake_up);
 	CHECK(containers::size(result) == 1);
 	CHECK(result.front() == value);
 }
 
-TEST_CASE("concurrent_queue: non_blocking_push never blocks") {
-	auto queue = concurrent::blocking_queue<int>(0);
-	auto const added = queue.non_blocking_push(6);
+TEST_CASE("concurrent_stack: non_blocking_push never blocks") {
+	auto stack = concurrent::blocking_stack<int>(0);
+	auto const added = stack.non_blocking_push(6);
 	CHECK(!added);
 }
 
-TEST_CASE("concurrent_queue: push unblocks when stop requested") {
-	auto queue = concurrent::blocking_queue<int>(0);
+TEST_CASE("concurrent_stack: push unblocks when stop requested") {
+	auto stack = concurrent::blocking_stack<int>(0);
 	auto source = std::stop_source();
 	auto const time_to_wake_up = now() + duration;
 	auto thread = std::jthread([&]{
 		std::this_thread::sleep_until(time_to_wake_up);
 		source.request_stop();
 	});
-	auto const added = queue.push(source.get_token(), 6);
+	auto const added = stack.push(source.get_token(), 6);
 	CHECK(now() >= time_to_wake_up);
 	CHECK(!added);
-	CHECK(queue.size() == 0);
+	CHECK(stack.size() == 0);
 }
 
-TEST_CASE("concurrent_queue: pop_one") {
-	auto queue = concurrent::basic_unbounded_queue<std::deque<int>>();
-	queue.append(containers::array{1, 2, 3});
-	CHECK(queue.pop_one() == 1);
-	CHECK(queue.pop_one() == 2);
-	CHECK(queue.pop_one() == 3);
-	CHECK(queue.size() == 0);
+TEST_CASE("concurrent_stack: pop_one") {
+	auto stack = concurrent::unbounded_stack<int>();
+	stack.append(containers::array{1, 2, 3});
+	CHECK(stack.pop_one() == 3);
+	CHECK(stack.pop_one() == 2);
+	CHECK(stack.pop_one() == 1);
+	CHECK(stack.size() == 0);
 }
 
 } // namespace

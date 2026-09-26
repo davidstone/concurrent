@@ -24,7 +24,22 @@ concept pop_frontable = requires(Container & container) {
 	containers::pop_front(container);
 };
 
-export template<typename Container, typename Mutex>
+export enum class sequence_type {
+	queue,
+	stack,
+};
+
+template<typename Container>
+constexpr auto multiple_removers_possible(sequence_type const type) -> bool {
+	switch (type) {
+		case sequence_type::queue:
+			return pop_frontable<Container>;
+		case sequence_type::stack:
+			return pop_backable<Container>;
+	}
+}
+
+export template<typename Container, typename Mutex, sequence_type type>
 struct queue_stack_impl {
 	using container_type = Container;
 	using value_type = containers::range_value_t<Container>;
@@ -365,7 +380,7 @@ private:
 		// A, B, 1, 2: Same as A, 1, 2, B. 2 never waits because 1 does not
 		// find an empty container.
 		if (was_empty) {
-			if constexpr (pop_frontable<Container>) {
+			if constexpr (multiple_removers_possible<Container>(type)) {
 				self.m_notify_addition.notify_all();
 			} else {
 				self.m_notify_addition.notify_one();
@@ -386,8 +401,17 @@ private:
 	// lock must be in the locked state
 	auto generic_pop_one(this auto & self, lock_type lock) -> value_type {
 		auto const previous_size = containers::size(self.m_container);
-		auto result = std::move(containers::front(self.m_container));
-		containers::pop_front(self.m_container);
+		auto result = [&] {
+			if constexpr (type == sequence_type::queue) {
+				auto value = std::move(containers::front(self.m_container));
+				containers::pop_front(self.m_container);
+				return value;
+			} else {
+				auto value = std::move(containers::back(self.m_container));
+				containers::pop_back(self.m_container);
+				return value;
+			}
+		}();
 		self.handle_remove_one(previous_size);
 		lock.unlock();
 		return result;

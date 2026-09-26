@@ -53,6 +53,7 @@ target_sources(concurrent PUBLIC
 		source/locked_access.cpp
 		source/queue.cpp
 		source/queue_stack_impl.cpp
+		source/stack.cpp
 )
 
 if(NOT WINDOWS)
@@ -63,6 +64,7 @@ endif()
 
 add_executable(concurrent_test
 	test/queue.cpp
+	test/stack.cpp
 )
 target_link_libraries(concurrent_test
 	concurrent
