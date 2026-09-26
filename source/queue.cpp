@@ -23,9 +23,9 @@ namespace concurrent {
 
 // basic_unbounded_queue is limited only by the available memory on the system
 export template<typename Container, typename Mutex = std::mutex>
-struct basic_unbounded_queue : private queue_stack_impl<Container, Mutex, basic_unbounded_queue<Container, Mutex>> {
+struct basic_unbounded_queue : private queue_stack_impl<Container, Mutex> {
 private:
-	using base = queue_stack_impl<Container, Mutex, basic_unbounded_queue<Container, Mutex>>;
+	using base = queue_stack_impl<Container, Mutex>;
 public:
 	using typename base::container_type;
 	using typename base::value_type;
@@ -75,9 +75,9 @@ using unbounded_queue = basic_unbounded_queue<std::vector<T>, std::mutex>;
 // elements when attempting to add data, the call will block until the size is
 // less than max_size().
 export template<typename Container, typename Mutex = std::mutex>
-struct basic_blocking_queue : private queue_stack_impl<Container, Mutex, basic_blocking_queue<Container, Mutex>> {
+struct basic_blocking_queue : private queue_stack_impl<Container, Mutex> {
 private:
-	using base = queue_stack_impl<Container, Mutex, basic_blocking_queue<Container, Mutex>>;
+	using base = queue_stack_impl<Container, Mutex>;
 public:
 	using typename base::container_type;
 	using typename base::value_type;
