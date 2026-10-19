@@ -51,6 +51,7 @@ target_sources(concurrent PUBLIC
 	FILES
 		source/concurrent.cpp
 		source/locked_access.cpp
+		source/map.cpp
 		source/queue.cpp
 		source/queue_stack_impl.cpp
 		source/stack.cpp
