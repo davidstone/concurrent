@@ -3,6 +3,10 @@
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
+module;
+
+#include <bounded/no_unique_address.hpp>
+
 export module concurrent.locked_access;
 
 import std_module;
@@ -42,7 +46,7 @@ struct locked_access {
 
 private:
 	mutable Mutex m_mutex;
-	[[no_unique_address]] T m_value;
+	BOUNDED_NO_UNIQUE_ADDRESS T m_value;
 };
 
 } // namespace concurrent
