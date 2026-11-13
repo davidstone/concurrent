@@ -46,7 +46,7 @@ struct locked_access {
 
 private:
 	mutable Mutex m_mutex;
-	BOUNDED_NO_UNIQUE_ADDRESS T m_value;
+	[[BOUNDED_NO_UNIQUE_ADDRESS]] T m_value;
 };
 
 } // namespace concurrent
